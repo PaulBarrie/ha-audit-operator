@@ -1,0 +1,20 @@
+domain: fr.esgi
+layout:
+- go.kubebuilder.io/v4-alpha
+projectName: ha-audit-operator
+repo: fr.esgi/ha-audit
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: fr.esgi
+  group: apps
+  kind: HAAudit
+  path: fr.esgi/ha-audit/api/v1beta1
+  version: v1beta1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+version: "3"

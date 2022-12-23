@@ -1,0 +1,12 @@
+apiVersion: apps.fr.esgi/v1beta1
+kind: HAAudit
+metadata:
+  labels:
+    app.kubernetes.io/name: haaudit
+    app.kubernetes.io/instance: haaudit-sample
+    app.kubernetes.io/part-of: ha-audit-operator
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: ha-audit-operator
+  name: haaudit-sample
+spec:
+  # TODO(user): Add fields here

@@ -1,0 +1,31 @@
+# permissions for end users to edit haaudits.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: haaudit-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: ha-audit-operator
+    app.kubernetes.io/part-of: ha-audit-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: haaudit-editor-role
+rules:
+- apiGroups:
+  - apps.fr.esgi
+  resources:
+  - haaudits
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.fr.esgi
+  resources:
+  - haaudits/status
+  verbs:
+  - get
