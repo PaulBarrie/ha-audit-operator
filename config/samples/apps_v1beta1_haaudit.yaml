@@ -9,4 +9,26 @@ metadata:
     app.kubernetes.io/created-by: ha-audit-operator
   name: haaudit-sample
 spec:
-  # TODO(user): Add fields here
+  targets:
+    - name: "instance-1-api-ha-test"
+      type: "deployment"
+      namespace: "default"
+
+    - type: "pod"
+      labelSelector:
+        matchLabels:
+          app: "instance-2-api-ha-test"
+      namespace: "default"
+
+    - type: "pod"
+      nameRegex: "instance-3-api-ha-test-.*"
+      namespace: "default"
+
+  chaosStrategy:
+    type: random
+    durationSeconds: 3600 # 1 hour
+    randomChaosStrategy:
+      numberOfPodsToDelete: 4
+      frequencyCron: "*/1 * * * *"
+
+

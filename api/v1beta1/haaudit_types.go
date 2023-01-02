@@ -23,13 +23,38 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type AuditTargetType string
+
+var (
+	Pod         AuditTargetType = "pod"
+	Deployment  AuditTargetType = "deployment"
+	StatefulSet AuditTargetType = "statefulset"
+	DaemonSet   AuditTargetType = "daemonset"
+	ReplicaSet  AuditTargetType = "replicaset"
+)
+
+type Target struct {
+	Type AuditTargetType `json:"type"`
+	// +optional
+	Name string `json:"name"`
+	// +optional
+	NameRegex string `json:"nameRegex"`
+	// +optional
+	Namespace string `json:"namespace"`
+	// +optional
+	LabelSelector metav1.LabelSelector `json:"labelSelector"`
+	// +optional
+	// +kubebuilder:default:="/"
+	Path string `json:"path"`
+}
+
 // HAAuditSpec defines the desired state of HAAudit
 type HAAuditSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of HAAudit. Edit haaudit_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Targets []Target `json:"targets"`
+	// +kubebuilder:validation:Required
+	ChaosStrategy ChaosStrategy `json:"chaosStrategy"`
 }
 
 // HAAuditStatus defines the observed state of HAAudit
