@@ -62,14 +62,11 @@ func (r *HAAuditReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	var service *ha_service.HAAuditService
 	service = ha_service.New(r.Client, ctx, &haAudit)
-	pods, err := service.GetTargets()
+	_, err := service.ApplyStrategy()
 	if err != nil {
-		kernel.Logger.Error(err, "unable to get targets")
 		return ctrl.Result{}, err
 	}
-	for _, pod := range pods.Objects {
-		kernel.Logger.Info("Pod", "Name", pod.Name)
-	}
+
 	/*
 		//https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html
 		isUnderDeletion := !(haAudit.ObjectMeta.DeletionTimestamp.IsZero())

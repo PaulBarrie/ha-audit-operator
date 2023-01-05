@@ -15,6 +15,7 @@ import (
 	"regexp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sync"
 )
 
 var (
@@ -27,28 +28,58 @@ type ResourceRepository struct {
 	Context context.Context
 }
 
-func (r *ResourceRepository) Get(target v1beta1.Target) ([]v1api.Pod, error) {
-	if target.Name != "" {
-		return r._getResource(GetResourceTypePayload(target.Type), target.Namespace, target.Name)
+var resourceRepositoryInstance *ResourceRepository
+var lock = &sync.Mutex{}
+
+func GetInstance(client client.Client, ctx context.Context) *ResourceRepository {
+	if resourceRepositoryInstance == nil {
+		lock.Lock()
+		defer lock.Unlock()
+		if resourceRepositoryInstance == nil {
+			resourceRepositoryInstance = &ResourceRepository{
+				Client:  client,
+				Context: ctx,
+			}
+		} else {
+			kernel.Logger.Info("ResourceRepository already initialized")
+		}
+	} else {
+		kernel.Logger.Info("ResourceRepository already initialized")
 	}
-	if !reflect.DeepEqual(target.LabelSelector, map[string]string{}) {
-		return r._getResource(GetResourceTypePayload(target.Type), target.Namespace, target.LabelSelector)
-	}
-	if target.NameRegex != "" {
-		return r._getResource(GetResourceTypePayload(target.Type), target.Namespace, target.NameRegex, true)
-	}
-	return r._getResource(GetResourceTypePayload(target.Type), target.Namespace)
+	return resourceRepositoryInstance
 }
 
-func (r *ResourceRepository) GetAll(targets []v1beta1.Target) ([]v1api.Pod, error) {
-	var res []v1api.Pod
+func (r *ResourceRepository) Get(target v1beta1.Target) (TargetResourcePayload, error) {
+	var pods []v1api.Pod
+	var err error
+	if target.Name != "" {
+		pods, err = r._getResource(GetResourceTypePayload(target.Kind), target.Namespace, target.Name)
+	} else if !reflect.DeepEqual(target.LabelSelector, map[string]string{}) {
+		pods, err = r._getResource(GetResourceTypePayload(target.Kind), target.Namespace, target.LabelSelector)
+	} else if target.NameRegex != "" {
+		pods, err = r._getResource(GetResourceTypePayload(target.Kind), target.Namespace, target.NameRegex, true)
+	} else {
+		pods, err = r._getResource(GetResourceTypePayload(target.Kind), target.Namespace)
+	}
+	if err != nil {
+		return TargetResourcePayload{}, err
+	}
+	return TargetResourcePayload{
+		Id:         target.Id,
+		TargetType: target.Kind,
+		Pods:       pods,
+	}, nil
+}
+
+func (r *ResourceRepository) GetAll(targets []v1beta1.Target) ([]TargetResourcePayload, error) {
+	var res []TargetResourcePayload
 	for _, target := range targets {
-		pods, err := r.Get(target)
+		targetResource, err := r.Get(target)
 		if err != nil {
 			kernel.Logger.Error(err, "error while getting resources")
 			break
 		}
-		res = append(res, pods...)
+		res = append(res, targetResource)
 	}
 	return res, nil
 }
@@ -109,16 +140,16 @@ func (r *ResourceRepository) _getResource(resourcePayload ResourceTypePayload, n
 func (r *ResourceRepository) _toPodList(list *unstructured.UnstructuredList) ([]v1api.Pod, error) {
 	var res []v1api.Pod
 	for _, item := range list.Items {
-		if item.GetKind() == "Pod" {
+		if item.GetKind() == "PodTarget" {
 			var pod v1api.Pod
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &pod); err != nil {
 				return []v1api.Pod{}, err
 			}
 			res = _appendOnce(res, pod)
-		} else if item.GetKind() == "Deployment" || item.GetKind() == "StatefulSet" ||
-			item.GetKind() == "Daemonset" || item.GetKind() == "ReplicaSet" {
+		} else if item.GetKind() == "DeploymentTarget" || item.GetKind() == "StatefulSetTarget" ||
+			item.GetKind() == "Daemonset" || item.GetKind() == "ReplicaSetTarget" {
 			toAppend, err1 := r._getResource(
-				GetResourceTypePayload("Pod"),
+				GetResourceTypePayload("PodTarget"),
 				item.GetNamespace(),
 				fmt.Sprintf("%s-*", item.GetName()),
 				true,

@@ -3,5 +3,7 @@ package repository
 type Repository interface {
 	Get(...interface{}) (interface{}, error)
 	GetAll(interface{}) ([]interface{}, error)
-	Delete() error
+	Update(...interface{}) error
+	Create(...interface{}) (interface{}, error)
+	Delete(interface{}) error
 }

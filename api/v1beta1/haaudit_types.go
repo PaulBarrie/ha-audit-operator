@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fr.esgi/ha-audit/controllers/pkg/kernel"
+	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,15 +28,16 @@ import (
 type AuditTargetType string
 
 var (
-	Pod         AuditTargetType = "pod"
-	Deployment  AuditTargetType = "deployment"
-	StatefulSet AuditTargetType = "statefulset"
-	DaemonSet   AuditTargetType = "daemonset"
-	ReplicaSet  AuditTargetType = "replicaset"
+	PodTarget         AuditTargetType = "pod"
+	DeploymentTarget  AuditTargetType = "deployment"
+	StatefulSetTarget AuditTargetType = "statefulset"
+	DaemonSetTarget   AuditTargetType = "daemonset"
+	ReplicaSetTarget  AuditTargetType = "replicaset"
 )
 
 type Target struct {
-	Type AuditTargetType `json:"type"`
+	Id   string          `json:"id"`
+	Kind AuditTargetType `json:"kind"`
 	// +optional
 	Name string `json:"name"`
 	// +optional
@@ -48,6 +51,23 @@ type Target struct {
 	Path string `json:"path"`
 }
 
+func (t *Target) Default(namespace string) Target {
+	if t.Namespace == "" {
+		t.Namespace = namespace
+	}
+	if t.Path == "" {
+		t.Path = "/"
+	}
+	if t.Id == "" {
+		id, err := uuid.NewRandom()
+		if err != nil {
+			kernel.Logger.Error(err, "Error while generating UUID")
+		}
+		t.Id = id.String()
+	}
+	return *t
+}
+
 // HAAuditSpec defines the desired state of HAAudit
 type HAAuditSpec struct {
 	// +kubebuilder:validation:Required
@@ -55,6 +75,16 @@ type HAAuditSpec struct {
 	Targets []Target `json:"targets"`
 	// +kubebuilder:validation:Required
 	ChaosStrategy ChaosStrategy `json:"chaosStrategy"`
+
+	// +optional
+	// +kubebuilder:default:="* * * * *"
+	TestSchedule string `json:"testSchedule"`
+	// +optional
+	Report HAReport `json:"report"`
+	// +kubebuilder:validation:ExclusiveMinimum=0
+	StrategyCronList []int `json:"cronList"`
+	// +kubebuilder:validation:ExclusiveMinimum=0
+	ReportCronList []int `json:"cronList"`
 }
 
 // HAAuditStatus defines the observed state of HAAudit

@@ -11,16 +11,14 @@ metadata:
 spec:
   targets:
     - name: "instance-1-api-ha-test"
-      type: "deployment"
+      kind: "deployment"
       namespace: "default"
-
-    - type: "pod"
+    - kind: "pod"
       labelSelector:
         matchLabels:
           app: "instance-2-api-ha-test"
       namespace: "default"
-
-    - type: "pod"
+    - kind: "pod"
       nameRegex: "instance-3-api-ha-test-.*"
       namespace: "default"
 
@@ -31,4 +29,7 @@ spec:
       numberOfPodsToDelete: 4
       frequencyCron: "*/1 * * * *"
 
-
+  testSchedule: "*/1 * * * *"
+  report:
+    prometheus:
+      address: ""
