@@ -40,11 +40,7 @@ func GetInstance(client client.Client, ctx context.Context) *ResourceRepository 
 				Client:  client,
 				Context: ctx,
 			}
-		} else {
-			kernel.Logger.Info("ResourceRepository already initialized")
 		}
-	} else {
-		kernel.Logger.Info("ResourceRepository already initialized")
 	}
 	return resourceRepositoryInstance
 }
@@ -92,14 +88,20 @@ func (r *ResourceRepository) Delete(pod *v1api.Pod) error {
 	return nil
 }
 
-func (r *ResourceRepository) _getResource(resourcePayload ResourceTypePayload, namespace string, opts ...interface{}) (
+func (r *ResourceRepository) _getResource(resourceId schema.GroupVersionResource, namespace string, opts ...interface{}) (
 	[]v1api.Pod, error) {
-	var options metav1.ListOptions = metav1.ListOptions{}
+	var options = metav1.ListOptions{}
 	var res []v1api.Pod
-
 	// Default: find in all the namespace
 	// Find with name
-	if len(opts) == 1 && reflect.TypeOf(opts[0]).Kind() == reflect.String {
+	if resourceId.Resource != string(PodResourceAPIName) {
+		return r._getResource(
+			GetResourceTypePayload(v1beta1.PodTarget),
+			namespace,
+			fmt.Sprintf("%s-*", opts[0].(string)),
+			true,
+		)
+	} else if len(opts) == 1 && reflect.TypeOf(opts[0]).Kind() == reflect.String {
 		options = metav1.ListOptions{
 			FieldSelector: fmt.Sprintf("metadata.name=%s", opts[0]),
 		}
@@ -119,21 +121,32 @@ func (r *ResourceRepository) _getResource(resourcePayload ResourceTypePayload, n
 		}
 	}
 
-	resourceId := schema.GroupVersionResource{
-		Group:    resourcePayload.Group,
-		Version:  resourcePayload.ApiVersion,
-		Resource: resourcePayload.Kind,
+	var list *unstructured.UnstructuredList
+	var err error
+	if reflect.DeepEqual(options, metav1.ListOptions{}) {
+		list, err = DynamicConfig.Resource(resourceId).Namespace(namespace).
+			List(r.Context, metav1.ListOptions{})
+	} else {
+		list, err = DynamicConfig.Resource(resourceId).Namespace(namespace).List(r.Context, options)
 	}
-
-	list, err := DynamicConfig.Resource(resourceId).Namespace(namespace).
-		List(r.Context, options)
 
 	if err != nil {
 		kernel.Logger.Error(err, fmt.Sprintf("Cannot get resource %v with options %v in %s namespace", resourceId, options, namespace))
 		return []v1api.Pod{}, err
 	}
-	res, err = r._toPodList(list)
 
+	for _, item := range list.Items {
+		pod := v1api.Pod{}
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &item); err != nil {
+			return []v1api.Pod{}, err
+		}
+
+		if err != nil {
+			kernel.Logger.Error(err, "error while getting pod from unstructured")
+			continue
+		}
+		res = _appendOnce(res, pod)
+	}
 	return res, nil
 }
 
@@ -146,8 +159,8 @@ func (r *ResourceRepository) _toPodList(list *unstructured.UnstructuredList) ([]
 				return []v1api.Pod{}, err
 			}
 			res = _appendOnce(res, pod)
-		} else if item.GetKind() == "DeploymentTarget" || item.GetKind() == "StatefulSetTarget" ||
-			item.GetKind() == "Daemonset" || item.GetKind() == "ReplicaSetTarget" {
+		} else if item.GetKind() == "DeploymentTarget" || item.GetKind() == "StatefulsetTarget" ||
+			item.GetKind() == "Daemonset" || item.GetKind() == "ReplicasetTarget" {
 			toAppend, err1 := r._getResource(
 				GetResourceTypePayload("PodTarget"),
 				item.GetNamespace(),

@@ -19,35 +19,42 @@ package v1beta1
 import (
 	"fr.esgi/ha-audit/controllers/pkg/kernel"
 	"github.com/google/uuid"
+	"github.com/robfig/cron/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+const (
+	DefaultPathPrefix = "http://"
+)
 
 type AuditTargetType string
 
 var (
 	PodTarget         AuditTargetType = "pod"
 	DeploymentTarget  AuditTargetType = "deployment"
-	StatefulSetTarget AuditTargetType = "statefulset"
-	DaemonSetTarget   AuditTargetType = "daemonset"
-	ReplicaSetTarget  AuditTargetType = "replicaset"
+	StatefulsetTarget AuditTargetType = "statefulset"
+	DaemonsetTarget   AuditTargetType = "daemonset"
+	ReplicasetTarget  AuditTargetType = "replicaset"
 )
 
 type Target struct {
-	Id   string          `json:"id"`
+	// +kubebuilder:validation:Optional
+	Id string `json:"id"`
+	// +kubebuilder:validation=Required
 	Kind AuditTargetType `json:"kind"`
-	// +optional
+	// +kubebuilder:validation:Optional
 	Name string `json:"name"`
-	// +optional
+	// +kubebuilder:validation:Optional
 	NameRegex string `json:"nameRegex"`
-	// +optional
+	// +kubebuilder:validation:Optional
 	Namespace string `json:"namespace"`
-	// +optional
+	// +kubebuilder:validation:Optional
 	LabelSelector metav1.LabelSelector `json:"labelSelector"`
-	// +optional
-	// +kubebuilder:default:="/"
+	// +kubebuilder:validation:Required
 	Path string `json:"path"`
 }
 
@@ -55,15 +62,15 @@ func (t *Target) Default(namespace string) Target {
 	if t.Namespace == "" {
 		t.Namespace = namespace
 	}
-	if t.Path == "" {
-		t.Path = "/"
-	}
 	if t.Id == "" {
 		id, err := uuid.NewRandom()
 		if err != nil {
 			kernel.Logger.Error(err, "Error while generating UUID")
 		}
 		t.Id = id.String()
+	}
+	if !strings.HasPrefix(t.Path, DefaultPathPrefix) {
+		t.Path = DefaultPathPrefix + t.Path
 	}
 	return *t
 }
@@ -73,18 +80,23 @@ type HAAuditSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	Targets []Target `json:"targets"`
+
 	// +kubebuilder:validation:Required
 	ChaosStrategy ChaosStrategy `json:"chaosStrategy"`
 
-	// +optional
-	// +kubebuilder:default:="* * * * *"
-	TestSchedule string `json:"testSchedule"`
-	// +optional
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=10
+	TestScheduleSeconds int64 `json:"testSchedule"`
+
+	// +kubebuilder:validation:Optional
+	TestReportCronId cron.EntryID `json:"testCronId"`
+
+	// +kubebuilder:validation:Optional
 	Report HAReport `json:"report"`
-	// +kubebuilder:validation:ExclusiveMinimum=0
-	StrategyCronList []int `json:"cronList"`
-	// +kubebuilder:validation:ExclusiveMinimum=0
-	ReportCronList []int `json:"cronList"`
+
+	// +kubebuilder:validation:Optional
+	StrategyCronId cron.EntryID `json:"stratCronId"`
+	// +kubebuilder:validation:Optional
 }
 
 // HAAuditStatus defines the observed state of HAAudit

@@ -13,23 +13,23 @@ spec:
     - name: "instance-1-api-ha-test"
       kind: "deployment"
       namespace: "default"
+      path: "instance-1-api-ha-test.default.svc.cluster.local/ping"
     - kind: "pod"
       labelSelector:
         matchLabels:
           app: "instance-2-api-ha-test"
       namespace: "default"
+      path: "instance-2-api-ha-test.default.svc.cluster.local/ping"
     - kind: "pod"
       nameRegex: "instance-3-api-ha-test-.*"
       namespace: "default"
+      path: "instance-2-api-ha-test.default.svc.cluster.local/ping"
 
   chaosStrategy:
     type: random
-    durationSeconds: 3600 # 1 hour
-    randomChaosStrategy:
-      numberOfPodsToDelete: 4
-      frequencyCron: "*/1 * * * *"
+    frequencySec: 30
 
-  testSchedule: "*/1 * * * *"
+  testSchedule: 10 # 10 seconds
   report:
     prometheus:
-      address: ""
+      address: "prometheus-prometheus-pushgateway.default.svc.cluster.local"

@@ -37,33 +37,102 @@ spec:
             properties:
               chaosStrategy:
                 properties:
-                  durationSeconds:
+                  chaosCronId:
+                    type: integer
+                  fixedStrategy:
+                    properties:
+                      targetPodsToKill:
+                        items:
+                          properties:
+                            id:
+                              default: ""
+                              type: string
+                            number:
+                              default: 1
+                              type: integer
+                          type: object
+                        type: array
+                    type: object
+                  frequencySec:
+                    default: 30
+                    format: int64
+                    type: integer
+                  numberOfPodsToKill:
                     default: 1
                     type: integer
-                  randomChaosStrategy:
+                  roundRobinStrategy:
                     properties:
-                      frequencyCron:
-                        default: '* * * * *'
+                      currentTarget:
                         type: string
-                      numberOfPodsToDelete:
-                        minimum: 0
-                        type: integer
-                    required:
-                    - frequencyCron
-                    - numberOfPodsToDelete
+                      targetPodsToKill:
+                        items:
+                          properties:
+                            id:
+                              default: ""
+                              type: string
+                            number:
+                              default: 1
+                              type: integer
+                          type: object
+                        type: array
                     type: object
                   type:
-                    enum:
-                    - random
-                    - targeted
                     type: string
                 required:
-                - durationSeconds
+                - frequencySec
                 - type
                 type: object
+              report:
+                properties:
+                  grafana:
+                    type: object
+                  prometheus:
+                    properties:
+                      address:
+                        type: string
+                      dumpFrequency:
+                        default: 10
+                        type: integer
+                      instanceUp:
+                        properties:
+                          help:
+                            type: string
+                          name:
+                            type: string
+                          type:
+                            type: string
+                        required:
+                        - help
+                        - name
+                        - type
+                        type: object
+                      instanceUpRate:
+                        properties:
+                          help:
+                            type: string
+                          name:
+                            type: string
+                          type:
+                            type: string
+                        required:
+                        - help
+                        - name
+                        - type
+                        type: object
+                    required:
+                    - address
+                    type: object
+                type: object
+              stratCronId:
+                description: EntryID identifies an entry within a Cron instance
+                type: integer
               targets:
                 items:
                   properties:
+                    id:
+                      type: string
+                    kind:
+                      type: string
                     labelSelector:
                       description: A label selector is a label query over a set of
                         resources. The result of matchLabels and matchExpressions
@@ -119,15 +188,20 @@ spec:
                     namespace:
                       type: string
                     path:
-                      default: /
-                      type: string
-                    type:
                       type: string
                   required:
-                  - type
+                  - kind
+                  - path
                   type: object
                 minItems: 1
                 type: array
+              testCronId:
+                description: EntryID identifies an entry within a Cron instance
+                type: integer
+              testSchedule:
+                default: 10
+                format: int64
+                type: integer
             required:
             - chaosStrategy
             - targets

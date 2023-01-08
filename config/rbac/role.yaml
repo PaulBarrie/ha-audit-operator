@@ -6,6 +6,21 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - '*'
+  resources:
+  - daemonsets
+  - deployments
+  - pods
+  - replicasets
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
   - apps.fr.esgi
   resources:
   - haaudits
@@ -27,6 +42,20 @@ rules:
   - apps.fr.esgi
   resources:
   - haaudits/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - batch.tutorial.kubebuilder.io
+  resources:
+  - cronjobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - batch.tutorial.kubebuilder.io
+  resources:
+  - cronjobs/status
   verbs:
   - get
   - patch

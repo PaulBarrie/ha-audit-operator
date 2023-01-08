@@ -5,15 +5,28 @@ import (
 	"fmt"
 	"fr.esgi/ha-audit/api/v1beta1"
 	"fr.esgi/ha-audit/controllers/pkg/kernel"
+	crd_repo "fr.esgi/ha-audit/controllers/pkg/repository/crd"
 	cron_repo "fr.esgi/ha-audit/controllers/pkg/repository/cron"
 	"fr.esgi/ha-audit/controllers/pkg/repository/prometheus"
 	resource_repo "fr.esgi/ha-audit/controllers/pkg/repository/resources"
 	v1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/rand"
-	"net/http"
+	"os"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sync"
 )
+
+var (
+	RunningEnvironment = "DEV"
+	lock               = &sync.Mutex{}
+)
+
+func init() {
+	envVar := os.Getenv("RunningEnvironment")
+	if envVar == "PROD" || envVar == "DEV" {
+		RunningEnvironment = envVar
+	}
+}
 
 type PodTargets struct {
 	Targets []v1beta1.Target
@@ -28,127 +41,137 @@ type HAAuditService struct {
 	ResourceRepository   *resource_repo.ResourceRepository
 	CronRepository       *cron_repo.CronRepository
 	PrometheusRepository *prometheus.PrometheusRepository
+	CRDRepository        *crd_repo.CRDRepository
 }
 
 func New(client client.Client, ctx context.Context, crd *v1beta1.HAAudit) *HAAuditService {
 	return &HAAuditService{
-		CRD:                crd,
-		Client:             client,
-		Context:            ctx,
-		Targets:            []resource_repo.TargetResourcePayload{},
-		ResourceRepository: resource_repo.GetInstance(client, ctx),
-		CronRepository:     cron_repo.GetInstance(),
+		CRD:                  crd,
+		Client:               client,
+		Context:              ctx,
+		Targets:              []resource_repo.TargetResourcePayload{},
+		ResourceRepository:   resource_repo.GetInstance(client, ctx),
+		CronRepository:       cron_repo.GetInstance(),
+		PrometheusRepository: prometheus.GetInstance(crd.Spec.Report.PrometheusReport.Address),
+		CRDRepository:        crd_repo.GetInstance(client, ctx),
 	}
 }
 
-func (H *HAAuditService) _acquireTargets() ([]resource_repo.TargetResourcePayload, error) {
-	get, err := H.ResourceRepository.GetAll(H.CRD.Spec.Targets)
-	if err != nil {
-		kernel.Logger.Error(err, "unable to get targets")
-		return []resource_repo.TargetResourcePayload{}, err
+func (H *HAAuditService) CreateOrUpdate() error {
+
+	if H.CRD.Spec.StrategyCronId == 0 && H.CRD.Spec.TestReportCronId == 0 {
+		kernel.Logger.Info("Create HAAudit routines")
+		err := H.Create()
+		if err != nil {
+			return err
+		}
+	} else {
+		kernel.Logger.Info("Update HAAudit routines")
+		err := H.Update(*H.CRD)
+		if err != nil {
+			return err
+		}
 	}
-	return get, nil
+	return nil
 }
 
-func (H *HAAuditService) ApplyStrategy() (int, error) {
-	var cronFunction func()
-	targets, err := H._acquireTargets()
-	if err != nil {
-		kernel.Logger.Error(err, "unable to get targets")
-		return -1, err
-	}
-	delTarget := func(target resource_repo.TargetResourcePayload) {
-		for i := 0; i < H.CRD.Spec.ChaosStrategy.NumberOfPodsToKill; i++ {
-			podToDeleteIndex := rand.IntnRange(0, len(targets))
-			pod := target.Pods[podToDeleteIndex]
-			if err := H.ResourceRepository.Delete(&pod); err != nil {
-				kernel.Logger.Error(err, "unable to delete pod")
-			}
-			targets = append(targets[:podToDeleteIndex], targets[podToDeleteIndex+1:]...)
-		}
-	}
+func (H *HAAuditService) Create() error {
 
-	switch H.CRD.Spec.ChaosStrategy.ChaosStrategyType {
-	case v1beta1.ChaosStrategyTypeRandom:
-		targetsFlat := resource_repo.TargetResourcePayload{TargetType: v1beta1.PodTarget, Pods: []v1api.Pod{}}
-		for _, target := range targets {
-			targetsFlat.Pods = append(targetsFlat.Pods, target.Pods...)
-		}
-		cronFunction = func() {
-			delTarget(targetsFlat)
-		}
-	case v1beta1.ChaosStrategyTypeRoundRobin:
-		cronFunction = func() {
-			var targetCandidate resource_repo.TargetResourcePayload
-			var targetIndex int
-			for i, target := range targets {
-				targetIndex = i
-				if target.Id == H.CRD.Spec.ChaosStrategy.RoundRobinStrategy.CurrentTargetId {
-					targetCandidate = target
-					break
+	if RunningEnvironment == "DEV" {
+		H.CRD.Spec.Targets = H._inferTargets()
+	}
+	kernel.Logger.Info(fmt.Sprintf("1/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
+	if err := H._scheduleStrategy(); err != nil {
+		kernel.Logger.Error(err, "unable to schedule strategy")
+		return err
+	}
+	kernel.Logger.Info(fmt.Sprintf("2/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
+
+	if err := H._scheduleTestReport(); err != nil {
+		kernel.Logger.Error(err, "unable to schedule tests")
+		return err
+	}
+	kernel.Logger.Info(fmt.Sprintf("3/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
+	if H.CRD.Spec.Report.PrometheusReport.Address != "" {
+		H.initPrometheusReport()
+	}
+	kernel.Logger.Info(fmt.Sprintf("4/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
+	if err := H.CRDRepository.Update(H.CRD); err != nil {
+		kernel.Logger.Error(err, "unable to update CRD")
+		return err
+	}
+	return nil
+}
+
+func (H *HAAuditService) Update(newCRD v1beta1.HAAudit) error {
+	nothingTodo := reflect.DeepEqual(H.CRD.Spec, newCRD.Spec)
+	updateAll := !reflect.DeepEqual(H.CRD.Spec.Targets, newCRD.Spec.Targets)
+	updateStrategy := !reflect.DeepEqual(H.CRD.Spec.ChaosStrategy, newCRD.Spec.ChaosStrategy)
+	targetPathChanged := func() bool {
+		for _, target := range H.CRD.Spec.Targets {
+			for _, newTarget := range newCRD.Spec.Targets {
+				if target.Name != newTarget.Name || target.Path != newTarget.Path {
+					return true
 				}
 			}
-			H.CRD.Spec.ChaosStrategy.RoundRobinStrategy.CurrentTargetId = targets[(targetIndex+1)%len(targets)].Id
-			// Save CRD
-			delTarget(targetCandidate)
 		}
-	case v1beta1.ChaosStrategyTypeFixed:
-		cronFunction = func() {
-			for _, target := range targets {
-				delTarget(target)
-			}
+		return false
+	}
+	updateTestReport := !reflect.DeepEqual(H.CRD.Spec.Report, newCRD.Spec.Report) || targetPathChanged()
+	if nothingTodo {
+		return nil
+	} else if updateAll {
+		if err := H._scheduleStrategy(); err != nil {
+			kernel.Logger.Error(err, "unable to schedule strategy")
+			return err
 		}
-	default:
-		return -1, nil
+		kernel.Logger.Info(fmt.Sprintf("11/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
+		if err := H._scheduleTestReport(); err != nil {
+			kernel.Logger.Error(err, "unable to schedule tests")
+			return err
+		}
+		kernel.Logger.Info(fmt.Sprintf("12/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
+
+	} else if updateStrategy {
+		if err := H._scheduleStrategy(); err != nil {
+			kernel.Logger.Error(err, "unable to schedule strategy")
+		}
+		kernel.Logger.Info(fmt.Sprintf("13/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
+	} else if updateTestReport {
+		if err := H._scheduleTestReport(); err != nil {
+			kernel.Logger.Error(err, "unable to schedule tests")
+			return err
+		}
+		kernel.Logger.Info(fmt.Sprintf("14/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
+
 	}
 
-	cronIds, err := H.CronRepository.Create(H.CRD.Spec.ChaosStrategy.FrequencyCron, cronFunction)
-	if err != nil {
-		kernel.Logger.Error(err, "unable to create cron")
-		return -1, err
+	if err := H.CRDRepository.Update(H.CRD); err != nil {
+		kernel.Logger.Error(err, "unable to update CRD")
+		return err
 	}
-	return cronIds.(int), nil
+
+	return nil
 }
 
-func (H *HAAuditService) _scheduleTests() (int, error) {
-	cronId, err := H.CronRepository.Create(H.CRD.Spec.TestSchedule, func() {
-		nbServiceUp := 0
-		for _, target := range H.CRD.Spec.Targets {
-			ok, err := _testTarget(target)
-			if err != nil {
-				kernel.Logger.Error(err, "unable to test target")
-			} else if ok {
-				nbServiceUp++
-			}
-		}
-		if !reflect.DeepEqual(H.CRD.Spec.Report.PrometheusReport, v1beta1.PrometheusReport{}) {
-			err := H.PrometheusRepository.Update(H.CRD.Spec.Report.PrometheusReport.InstanceUp, nbServiceUp)
-			if err != nil {
-				kernel.Logger.Error(err, "unable to update prometheus")
-			}
-		}
-		if !reflect.DeepEqual(H.CRD.Spec.Report.GrafanaReport, v1beta1.GrafanaReport{}) {
-			//err = H.PrometheusRepository.Update(H.CRD.Spec.HAReport.GrafanaReport., nbServiceUp)
-			//if err != nil {
-			//	kernel.Logger.Error(err, "unable to update prometheus")
-			//}
-		}
-
-	})
+func (H *HAAuditService) Delete() error {
+	lock.Lock()
+	defer lock.Unlock()
+	kernel.Logger.Info("Delete HAAudit routines")
+	err := H.CronRepository.Delete(H.CRD.Spec.TestReportCronId)
 	if err != nil {
-		kernel.Logger.Error(err, "unable to create cron")
-		return -1, err
+		kernel.Logger.Error(err, "unable to delete cron")
+		return err
 	}
-	return cronId.(int), nil
-}
-
-func _testTarget(target v1beta1.Target) (bool, error) {
-	response, err := http.Get(target.Path)
-	if response.StatusCode/100 == 5 {
-		return false, nil
-	} else if err != nil {
-		fmt.Printf("The HTTP request failed with error %s\n", err)
-		return false, err
+	err = H.CronRepository.Delete(H.CRD.Spec.StrategyCronId)
+	if err != nil {
+		kernel.Logger.Error(err, "unable to delete cron")
+		return err
 	}
-	return true, nil
+	err = H.CRDRepository.Delete(H.CRD)
+	if err != nil {
+		kernel.Logger.Error(err, "unable to delete CRD")
+		return err
+	}
+	return nil
 }

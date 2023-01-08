@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"fr.esgi/ha-audit/api/v1beta1"
 	appsv1beta1 "fr.esgi/ha-audit/api/v1beta1"
 	"fr.esgi/ha-audit/controllers/pkg/kernel"
@@ -26,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	_ "sigs.k8s.io/controller-runtime/examples/crd/pkg"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -43,6 +45,11 @@ type HAAuditReconciler struct {
 //+kubebuilder:rbac:groups=apps.fr.esgi,resources=haaudits/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=apps.fr.esgi,resources=haaudits/finalizers,verbs=update
 
+//+kubebuilder:rbac:groups=*,resources=deployments;pods;statefulsets;replicasets;daemonsets,verbs=get;list;create;update;watch;delete
+
+//+kubebuilder:rbac:groups=batch.tutorial.kubebuilder.io,resources=cronjobs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=batch.tutorial.kubebuilder.io,resources=cronjobs/finalizers,verbs=update
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
@@ -57,42 +64,41 @@ func (r *HAAuditReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	kernel.Logger.WithValues("Namespace", req.NamespacedName)
 	haAudit := v1beta1.HAAudit{}
 	if err := r.Get(ctx, req.NamespacedName, &haAudit); err != nil {
-		kernel.Logger.Error(err, "unable to fetch HA Audit CRD")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		kernel.Logger.Info(fmt.Sprintf("unable to fetch HA Audit CRD: %v", err))
+		return ctrl.Result{}, nil
 	}
 	var service *ha_service.HAAuditService
 	service = ha_service.New(r.Client, ctx, &haAudit)
-	_, err := service.ApplyStrategy()
+
+	//https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html
+	isUnderDeletion := !(haAudit.ObjectMeta.DeletionTimestamp.IsZero())
+	thereIsFinalizer := controllerutil.ContainsFinalizer(&haAudit, finalizerName)
+	if isUnderDeletion {
+		kernel.Logger.Info("Deleting HA Audit CRD")
+		if thereIsFinalizer {
+			// Remove resources
+			if err := service.Delete(); err != nil {
+				return ctrl.Result{}, err
+			}
+			// Remove finalizer
+			controllerutil.RemoveFinalizer(&haAudit, finalizerName)
+			if err := r.Update(ctx, &haAudit); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		if !thereIsFinalizer {
+			controllerutil.AddFinalizer(&haAudit, finalizerName)
+			if err := r.Update(ctx, &haAudit); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	}
+	kernel.Logger.Info("Reconciling HA Audit CRD")
+	err := service.CreateOrUpdate()
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-
-	/*
-		//https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html
-		isUnderDeletion := !(haAudit.ObjectMeta.DeletionTimestamp.IsZero())
-		thereIsFinalizer := controllerutil.ContainsFinalizer(&haAudit, finalizerName)
-		if isUnderDeletion {
-			if thereIsFinalizer {
-				// Remove resources
-				/*
-					if err := mongoService.Delete(); err != nil {
-							return ctrl.Result{}, err
-						}
-				// Remove finalizer
-				controllerutil.RemoveFinalizer(&haAudit, finalizerName)
-				if err := r.Update(ctx, &haAudit); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
-		} else {
-			if !thereIsFinalizer {
-				controllerutil.AddFinalizer(&haAudit, finalizerName)
-				if err := r.Update(ctx, &haAudit); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
-		}
-	*/
 
 	return ctrl.Result{}, nil
 
