@@ -23,12 +23,14 @@ import (
 	appsv1beta1 "fr.esgi/ha-audit/api/v1beta1"
 	"fr.esgi/ha-audit/controllers/pkg/kernel"
 	ha_service "fr.esgi/ha-audit/controllers/pkg/service"
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	_ "sigs.k8s.io/controller-runtime/examples/crd/pkg"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 const (
@@ -62,6 +64,7 @@ type HAAuditReconciler struct {
 func (r *HAAuditReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 	kernel.Logger.WithValues("Namespace", req.NamespacedName)
+	initPrometheus()
 	haAudit := v1beta1.HAAudit{}
 	if err := r.Get(ctx, req.NamespacedName, &haAudit); err != nil {
 		kernel.Logger.Info(fmt.Sprintf("unable to fetch HA Audit CRD: %v", err))
@@ -109,4 +112,19 @@ func (r *HAAuditReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1beta1.HAAudit{}).
 		Complete(r)
+}
+
+func initPrometheus() {
+	goobers := prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "goobers_total",
+			Help: "Number of goobers proccessed",
+		},
+	)
+	err := metrics.Registry.Register(goobers)
+	if err != nil {
+		return
+	}
+	kernel.Logger.Info("Goobers registered")
+	goobers.Inc()
 }

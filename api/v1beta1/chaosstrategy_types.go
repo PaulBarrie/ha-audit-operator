@@ -13,10 +13,6 @@ type ChaosStrategy struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=1
 	NumberOfPodsToKill int `json:"numberOfPodsToKill"`
-	// +kubebuilder:validation:Optional
-	RoundRobinStrategy RoundRobinStrategy `json:"roundRobinStrategy,omitempty"`
-	// +kubebuilder:validation:Optional
-	FixedStrategy FixedStrategy `json:"fixedStrategy,omitempty"`
 	// +kubebuilder:default=30
 	FrequencySeconds int64 `json:"frequencySec"`
 	// +kubebuilder:validation:Optional
@@ -36,6 +32,7 @@ type RoundRobinStrategy struct {
 	// +kubebuilder:validation:Optional
 	TargetPodsToKill []TargetKill `json:"targetPodsToKill,omitempty"`
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
 	CurrentTargetId string `json:"currentTarget"`
 }
 

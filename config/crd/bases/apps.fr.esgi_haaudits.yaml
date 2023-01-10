@@ -39,20 +39,6 @@ spec:
                 properties:
                   chaosCronId:
                     type: integer
-                  fixedStrategy:
-                    properties:
-                      targetPodsToKill:
-                        items:
-                          properties:
-                            id:
-                              default: ""
-                              type: string
-                            number:
-                              default: 1
-                              type: integer
-                          type: object
-                        type: array
-                    type: object
                   frequencySec:
                     default: 30
                     format: int64
@@ -60,22 +46,6 @@ spec:
                   numberOfPodsToKill:
                     default: 1
                     type: integer
-                  roundRobinStrategy:
-                    properties:
-                      currentTarget:
-                        type: string
-                      targetPodsToKill:
-                        items:
-                          properties:
-                            id:
-                              default: ""
-                              type: string
-                            number:
-                              default: 1
-                              type: integer
-                          type: object
-                        type: array
-                    type: object
                   type:
                     type: string
                 required:
@@ -84,8 +54,6 @@ spec:
                 type: object
               report:
                 properties:
-                  grafana:
-                    type: object
                   prometheus:
                     properties:
                       address:
@@ -119,13 +87,22 @@ spec:
                         - name
                         - type
                         type: object
+                      serviceAccount:
+                        properties:
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
                     required:
                     - address
                     type: object
+                required:
+                - prometheus
                 type: object
-              stratCronId:
-                description: EntryID identifies an entry within a Cron instance
-                type: integer
               targets:
                 items:
                   properties:
@@ -195,19 +172,73 @@ spec:
                   type: object
                 minItems: 1
                 type: array
-              testCronId:
-                description: EntryID identifies an entry within a Cron instance
-                type: integer
               testSchedule:
                 default: 10
                 format: int64
                 type: integer
             required:
             - chaosStrategy
+            - report
             - targets
             type: object
           status:
             description: HAAuditStatus defines the observed state of HAAudit
+            properties:
+              fixedStrategy:
+                properties:
+                  targetPodsToKill:
+                    items:
+                      properties:
+                        id:
+                          default: ""
+                          type: string
+                        number:
+                          default: 1
+                          type: integer
+                      type: object
+                    type: array
+                type: object
+              nextChaosDateTime:
+                format: int64
+                type: integer
+              prometheusClusterRoleBinding:
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
+              roundRobinStrategy:
+                properties:
+                  currentTarget:
+                    default: ""
+                    type: string
+                  targetPodsToKill:
+                    items:
+                      properties:
+                        id:
+                          default: ""
+                          type: string
+                        number:
+                          default: 1
+                          type: integer
+                      type: object
+                    type: array
+                type: object
+              stratCronId:
+                description: EntryID identifies an entry within a Cron instance
+                type: integer
+              testCronId:
+                description: EntryID identifies an entry within a Cron instance
+                type: integer
+            required:
+            - nextChaosDateTime
+            - prometheusClusterRoleBinding
+            - stratCronId
+            - testCronId
             type: object
         type: object
     served: true

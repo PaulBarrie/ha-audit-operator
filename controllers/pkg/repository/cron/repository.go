@@ -8,19 +8,19 @@ import (
 	"sync"
 )
 
-type CronRepository struct {
+type Repository struct {
 	Cron *cron.Cron
 }
 
-var cronRepositoryInstance *CronRepository
+var cronRepositoryInstance *Repository
 var mutex = &sync.Mutex{}
 
-func GetInstance() *CronRepository {
+func GetInstance() *Repository {
 	if cronRepositoryInstance == nil {
 		mutex.Lock()
 		defer mutex.Unlock()
 		if cronRepositoryInstance == nil {
-			cronRepositoryInstance = &CronRepository{
+			cronRepositoryInstance = &Repository{
 				Cron: cron.New(),
 			}
 		}
@@ -28,16 +28,16 @@ func GetInstance() *CronRepository {
 	return cronRepositoryInstance
 }
 
-func (c *CronRepository) Get(args ...interface{}) (interface{}, error) {
+func (c *Repository) Get(args ...interface{}) (interface{}, error) {
 	panic("implement me")
 }
 
-func (c *CronRepository) GetAll(i interface{}) ([]interface{}, error) {
+func (c *Repository) GetAll(i interface{}) ([]interface{}, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *CronRepository) Create(args ...interface{}) (interface{}, error) {
+func (c *Repository) Create(args ...interface{}) (interface{}, error) {
 	if len(args) != 2 && reflect.TypeOf(args[0]).Kind() != reflect.Int && reflect.TypeOf(args[1]).Kind() != reflect.Func {
 		return nil, kernel.ErrorInvalidArgument("args must be a string and a func")
 	}
@@ -46,7 +46,6 @@ func (c *CronRepository) Create(args ...interface{}) (interface{}, error) {
 			"@every %ds", args[0].(int)),
 		args[1].(func()),
 	)
-	kernel.Logger.Info("cron created", "cronID", id)
 	if err != nil {
 		kernel.Logger.Error(err, "unable to add func to cron")
 		return nil, err
@@ -57,7 +56,7 @@ func (c *CronRepository) Create(args ...interface{}) (interface{}, error) {
 	return id, nil
 }
 
-func (c *CronRepository) Update(args ...interface{}) (interface{}, error) {
+func (c *Repository) Update(args ...interface{}) (interface{}, error) {
 	if len(args) != 2 &&
 		reflect.TypeOf(args[0]).Kind() != reflect.Int &&
 		reflect.TypeOf(args[1]) != reflect.TypeOf(Payload{}) {
@@ -75,7 +74,7 @@ func (c *CronRepository) Update(args ...interface{}) (interface{}, error) {
 	return cronId, nil
 }
 
-func (c *CronRepository) Delete(args interface{}) error {
+func (c *Repository) Delete(args interface{}) error {
 	if reflect.TypeOf(args) != reflect.TypeOf(cron.EntryID(0)) {
 		return kernel.ErrorInvalidArgument("args must be an cron.EntryID")
 	}

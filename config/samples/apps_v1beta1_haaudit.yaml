@@ -9,6 +9,12 @@ metadata:
     app.kubernetes.io/created-by: ha-audit-operator
   name: haaudit-sample
 spec:
+  report:
+    prometheus:
+      address: "prometheus-prometheus-pushgateway.default.svc.cluster.local"
+      serviceAccount:
+        name: "prometheus-prometheus-pushgateway"
+        namespace: "default"
   targets:
     - name: "instance-1-api-ha-test"
       kind: "deployment"
@@ -23,13 +29,8 @@ spec:
     - kind: "pod"
       nameRegex: "instance-3-api-ha-test-.*"
       namespace: "default"
-      path: "instance-2-api-ha-test.default.svc.cluster.local/ping"
-
+      path: "instance-3-api-ha-test.default.svc.cluster.local/ping"
   chaosStrategy:
     type: random
     frequencySec: 30
-
   testSchedule: 10 # 10 seconds
-  report:
-    prometheus:
-      address: "prometheus-prometheus-pushgateway.default.svc.cluster.local"

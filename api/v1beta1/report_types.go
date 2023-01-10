@@ -7,17 +7,21 @@ import (
 )
 
 type HAReport struct {
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Required
 	PrometheusReport PrometheusReport `json:"prometheus"`
-	// +kubebuilder:validation:Optional
-	GrafanaReport GrafanaReport `json:"grafana"`
+}
+
+type ServiceAccount struct {
+	SAName      string `json:"name"`
+	SANamespace string `json:"namespace"`
 }
 
 type PrometheusMetricType string
 
 const (
-	PrometheusMetricTypeCounter PrometheusMetricType = "counter"
-	PrometheusMetricTypeRate    PrometheusMetricType = "rate"
+	PrometheusMetricTypeCounter   PrometheusMetricType = "counter"
+	PrometheusMetricTypeHistogram PrometheusMetricType = "histogram"
+	PrometheusMetricTypeGauge     PrometheusMetricType = "gauge"
 )
 
 type PrometheusMetric struct {
@@ -27,7 +31,10 @@ type PrometheusMetric struct {
 }
 
 type PrometheusReport struct {
+	// +kubebuilder:validation:Required
 	Address string `json:"address"`
+	// +kubebuilder:validation:Optional
+	ServiceAccount ServiceAccount `json:"serviceAccount"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=10
 	DumpFrequencySeconds int `json:"dumpFrequency"`
@@ -50,7 +57,7 @@ func (p *PrometheusReport) Get(name string, rate int) PrometheusReport {
 
 func DefaultTotalRunningInstanceMetric(name string, rate int) *PrometheusMetric {
 	return &PrometheusMetric{
-		Type: PrometheusMetricTypeCounter,
+		Type: PrometheusMetricTypeGauge,
 		Name: fmt.Sprintf(
 			"%s_total_running_instance_seconds",
 			strings.ReplaceAll(name, "-", "_"),
@@ -65,7 +72,7 @@ func DefaultTotalRunningInstanceMetric(name string, rate int) *PrometheusMetric 
 
 func DefaultTotalRunningInstanceRateMetric(name string, rate int) *PrometheusMetric {
 	return &PrometheusMetric{
-		Type: PrometheusMetricTypeRate,
+		Type: PrometheusMetricTypeGauge,
 		Name: fmt.Sprintf("%s_rate_running_instance_seconds", strings.ReplaceAll(name, "-", "_")),
 		Help: fmt.Sprintf(
 			"The running instance rate for %s report recorded every %d seconds",
@@ -73,7 +80,4 @@ func DefaultTotalRunningInstanceRateMetric(name string, rate int) *PrometheusMet
 			rate,
 		),
 	}
-}
-
-type GrafanaReport struct {
 }

@@ -22,7 +22,7 @@ func _testTarget(target v1beta1.Target) (bool, error) {
 
 	response, err := http.Get(target.Path)
 	if err != nil {
-		kernel.Logger.Error(err, "Unable to test target")
+		kernel.Logger.Info(fmt.Sprintf("Unable to test target: %v", err))
 		return false, err
 	}
 	kernel.Logger.Info(fmt.Sprintf("Response %v", response))

@@ -8,6 +8,7 @@ import (
 	crd_repo "fr.esgi/ha-audit/controllers/pkg/repository/crd"
 	cron_repo "fr.esgi/ha-audit/controllers/pkg/repository/cron"
 	"fr.esgi/ha-audit/controllers/pkg/repository/prometheus"
+	rbac_repo "fr.esgi/ha-audit/controllers/pkg/repository/rbac"
 	resource_repo "fr.esgi/ha-audit/controllers/pkg/repository/resources"
 	v1api "k8s.io/api/core/v1"
 	"os"
@@ -39,9 +40,10 @@ type HAAuditService struct {
 	Context              context.Context
 	Targets              []resource_repo.TargetResourcePayload
 	ResourceRepository   *resource_repo.ResourceRepository
-	CronRepository       *cron_repo.CronRepository
-	PrometheusRepository *prometheus.PrometheusRepository
-	CRDRepository        *crd_repo.CRDRepository
+	CronRepository       *cron_repo.Repository
+	PrometheusRepository *prometheus.Repository
+	CRDRepository        *crd_repo.Repository
+	RBACRepository       *rbac_repo.Repository
 }
 
 func New(client client.Client, ctx context.Context, crd *v1beta1.HAAudit) *HAAuditService {
@@ -54,12 +56,13 @@ func New(client client.Client, ctx context.Context, crd *v1beta1.HAAudit) *HAAud
 		CronRepository:       cron_repo.GetInstance(),
 		PrometheusRepository: prometheus.GetInstance(crd.Spec.Report.PrometheusReport.Address),
 		CRDRepository:        crd_repo.GetInstance(client, ctx),
+		RBACRepository:       rbac_repo.GetInstance(client, ctx),
 	}
 }
 
 func (H *HAAuditService) CreateOrUpdate() error {
 
-	if H.CRD.Spec.StrategyCronId == 0 && H.CRD.Spec.TestReportCronId == 0 {
+	if H.CRD.Status.StrategyCronId == 0 && H.CRD.Status.TestReportCronId == 0 {
 		kernel.Logger.Info("Create HAAudit routines")
 		err := H.Create()
 		if err != nil {
@@ -76,26 +79,21 @@ func (H *HAAuditService) CreateOrUpdate() error {
 }
 
 func (H *HAAuditService) Create() error {
-
 	if RunningEnvironment == "DEV" {
 		H.CRD.Spec.Targets = H._inferTargets()
 	}
-	kernel.Logger.Info(fmt.Sprintf("1/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
 	if err := H._scheduleStrategy(); err != nil {
 		kernel.Logger.Error(err, "unable to schedule strategy")
 		return err
 	}
-	kernel.Logger.Info(fmt.Sprintf("2/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
 
 	if err := H._scheduleTestReport(); err != nil {
 		kernel.Logger.Error(err, "unable to schedule tests")
 		return err
 	}
-	kernel.Logger.Info(fmt.Sprintf("3/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
 	if H.CRD.Spec.Report.PrometheusReport.Address != "" {
 		H.initPrometheusReport()
 	}
-	kernel.Logger.Info(fmt.Sprintf("4/CRD Version: %s", H.CRD.ObjectMeta.ResourceVersion))
 	if err := H.CRDRepository.Update(H.CRD); err != nil {
 		kernel.Logger.Error(err, "unable to update CRD")
 		return err
@@ -158,18 +156,20 @@ func (H *HAAuditService) Delete() error {
 	lock.Lock()
 	defer lock.Unlock()
 	kernel.Logger.Info("Delete HAAudit routines")
-	err := H.CronRepository.Delete(H.CRD.Spec.TestReportCronId)
+	err := H.CronRepository.Delete(H.CRD.Status.TestReportCronId)
 	if err != nil {
 		kernel.Logger.Error(err, "unable to delete cron")
 		return err
 	}
-	err = H.CronRepository.Delete(H.CRD.Spec.StrategyCronId)
-	if err != nil {
+	if err = H.CronRepository.Delete(H.CRD.Status.StrategyCronId); err != nil {
 		kernel.Logger.Error(err, "unable to delete cron")
 		return err
 	}
-	err = H.CRDRepository.Delete(H.CRD)
-	if err != nil {
+	//if err = H.RBACRepository.Delete(H.CRD.Status.PrometheusClusterRoleBinding); err != nil {
+	//	kernel.Logger.Error(err, "unable to delete CRD")
+	//	return err
+	//}
+	if err = H.CRDRepository.Delete(H.CRD); err != nil {
 		kernel.Logger.Error(err, "unable to delete CRD")
 		return err
 	}

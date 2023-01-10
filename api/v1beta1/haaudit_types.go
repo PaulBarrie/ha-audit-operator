@@ -88,21 +88,18 @@ type HAAuditSpec struct {
 	// +kubebuilder:default:=10
 	TestScheduleSeconds int64 `json:"testSchedule"`
 
-	// +kubebuilder:validation:Optional
-	TestReportCronId cron.EntryID `json:"testCronId"`
-
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Required
 	Report HAReport `json:"report"`
-
-	// +kubebuilder:validation:Optional
-	StrategyCronId cron.EntryID `json:"stratCronId"`
-	// +kubebuilder:validation:Optional
 }
 
 // HAAuditStatus defines the observed state of HAAudit
 type HAAuditStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	TestReportCronId             cron.EntryID       `json:"testCronId"`
+	StrategyCronId               cron.EntryID       `json:"stratCronId"`
+	RoundRobinStrategy           RoundRobinStrategy `json:"roundRobinStrategy,omitempty"`
+	FixedStrategy                FixedStrategy      `json:"fixedStrategy,omitempty"`
+	PrometheusClusterRoleBinding NamespacedName     `json:"prometheusClusterRoleBinding"`
+	NextChaosDateTime            int64              `json:"nextChaosDateTime"`
 }
 
 //+kubebuilder:object:root=true

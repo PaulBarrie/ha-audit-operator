@@ -8,12 +8,16 @@ import (
 	"github.com/robfig/cron/v3"
 	v1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	time "time"
 )
 
 func (H *HAAuditService) _getStrategyCronFunction(targets []resource_repo.TargetResourcePayload) (func(), error) {
 	var cronFunction func()
 
 	delTarget := func(target resource_repo.TargetResourcePayload) {
+		if H.CRD.Status.NextChaosDateTime < time.Now().Unix() {
+			return
+		}
 		for i := 0; i < H.CRD.Spec.ChaosStrategy.NumberOfPodsToKill; i++ {
 			podToDeleteIndex := rand.IntnRange(0, len(targets))
 			pod := target.Pods[podToDeleteIndex]
@@ -22,6 +26,7 @@ func (H *HAAuditService) _getStrategyCronFunction(targets []resource_repo.Target
 			}
 			targets = append(targets[:podToDeleteIndex], targets[podToDeleteIndex+1:]...)
 		}
+		H.CRD.Status.NextChaosDateTime = time.Now().Unix() + H.CRD.Spec.ChaosStrategy.FrequencySeconds
 	}
 
 	switch H.CRD.Spec.ChaosStrategy.ChaosStrategyType {
@@ -39,13 +44,13 @@ func (H *HAAuditService) _getStrategyCronFunction(targets []resource_repo.Target
 			var targetIndex int
 			for i, target := range targets {
 				targetIndex = i
-				if target.Id == H.CRD.Spec.ChaosStrategy.RoundRobinStrategy.CurrentTargetId {
+				if target.Id == H.CRD.Status.RoundRobinStrategy.CurrentTargetId {
 					targetCandidate = target
 					break
 				}
 			}
 			newCRD := H.CRD.DeepCopy()
-			newCRD.Spec.ChaosStrategy.RoundRobinStrategy.CurrentTargetId = targets[(targetIndex+1)%len(targets)].Id
+			newCRD.Status.RoundRobinStrategy.CurrentTargetId = targets[(targetIndex+1)%len(targets)].Id
 			err := H.CRDRepository.Update(newCRD)
 			if err != nil {
 				return
@@ -68,7 +73,7 @@ func (H *HAAuditService) _getStrategyCronFunction(targets []resource_repo.Target
 func (H *HAAuditService) _scheduleStrategy() error {
 	kernel.Logger.Info("scheduling strategy")
 	targets, err := H._acquireTargets()
-	if err != nil {
+	if err != nil || len(targets) == 0 {
 		kernel.Logger.Error(err, "unable to get targets")
 		return err
 	}
