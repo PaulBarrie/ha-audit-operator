@@ -18,14 +18,11 @@ func (H *HAAuditService) _acquireTargets() ([]resource_repo.TargetResourcePayloa
 }
 
 func _testTarget(target v1beta1.Target) (bool, error) {
-	kernel.Logger.Info(fmt.Sprintf("Test target path %s", target.Path))
-
 	response, err := http.Get(target.Path)
 	if err != nil {
 		kernel.Logger.Info(fmt.Sprintf("Unable to test target: %v", err))
 		return false, err
 	}
-	kernel.Logger.Info(fmt.Sprintf("Response %v", response))
 	if response.StatusCode/100 == 5 {
 		return false, nil
 	}

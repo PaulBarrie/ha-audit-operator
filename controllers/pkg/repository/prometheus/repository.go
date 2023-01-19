@@ -3,6 +3,7 @@ package prometheus
 import (
 	"fmt"
 	"fr.esgi/ha-audit/api/v1beta1"
+	metric_db "fr.esgi/ha-audit/controllers/pkg/db/metric"
 	"fr.esgi/ha-audit/controllers/pkg/kernel"
 	"github.com/prometheus/client_golang/prometheus"
 	"reflect"
@@ -37,10 +38,7 @@ func GetInstance(address string) *Repository {
 }
 
 func (p *Repository) Get(args ...interface{}) (interface{}, error) {
-	if len(args) != 1 && reflect.TypeOf(args[0]) != reflect.TypeOf(v1beta1.PrometheusMetric{}) {
-		return nil, kernel.ErrorInvalidArgument("args must be a PrometheusMetric")
-	}
-	return p._getOrCreate(args[0])
+	panic("implement me")
 }
 
 func (p *Repository) GetAll(i interface{}) ([]interface{}, error) {
@@ -49,55 +47,10 @@ func (p *Repository) GetAll(i interface{}) ([]interface{}, error) {
 }
 
 func (p *Repository) Create(args ...interface{}) (interface{}, error) {
-	if len(args) != 1 && reflect.TypeOf(args[0]) != reflect.TypeOf(v1beta1.PrometheusMetric{}) {
+	if len(args) != 1 && reflect.TypeOf(args) != reflect.TypeOf(v1beta1.PrometheusMetric{}) {
 		return nil, kernel.ErrorInvalidArgument("args must be a PrometheusMetric")
 	}
-	return p._getOrCreate(args[0])
-}
-
-func (p *Repository) Update(args ...interface{}) (interface{}, error) {
-	if len(args) != 2 && reflect.TypeOf(args[0]) != reflect.TypeOf(v1beta1.PrometheusMetric{}) && reflect.TypeOf(args[1]).Kind() != reflect.Float64 {
-		return nil, kernel.ErrorInvalidArgument("args must be a string and a float64")
-	}
-	metric, err := p.Get(args[0])
-	if err != nil {
-		kernel.Logger.Error(err, "unable to get prometheus metric")
-		return nil, err
-	}
-
-	kernel.Logger.Info(fmt.Sprintf("metric %s updated, with value %f", args[0].(v1beta1.PrometheusMetric).Name, args[1].(float64)))
-	switch args[0].(v1beta1.PrometheusMetric).Type {
-	case v1beta1.PrometheusMetricTypeHistogram:
-		histogram := metric.(prometheus.Histogram)
-		histogram.Observe(args[1].(float64))
-	case v1beta1.PrometheusMetricTypeCounter:
-		counter := metric.(prometheus.Counter)
-		counter.Add(args[1].(float64))
-	case v1beta1.PrometheusMetricTypeGauge:
-		gauge := metric.(prometheus.Gauge)
-		gauge.Set(args[1].(float64))
-	default:
-		return nil, kernel.ErrorInvalidArgument(
-			fmt.Sprintf(
-				"First arg must be a prometheus metric and not : %s. Accepted: %s or %s",
-				metric, v1beta1.PrometheusMetricTypeCounter, v1beta1.PrometheusMetricTypeHistogram,
-			),
-		)
-	}
-
-	return metric, nil
-}
-
-func (p *Repository) Delete(i interface{}) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (p *Repository) _getOrCreate(args interface{}) (interface{}, error) {
-	if reflect.TypeOf(args) != reflect.TypeOf(v1beta1.PrometheusMetric{}) {
-		return nil, kernel.ErrorInvalidArgument("args must be a PrometheusMetric")
-	}
-	prometheusMetric := args.(v1beta1.PrometheusMetric)
+	prometheusMetric := args[0].(v1beta1.PrometheusMetric)
 
 	switch prometheusMetric.Type {
 	case v1beta1.PrometheusMetricTypeCounter:
@@ -108,6 +61,7 @@ func (p *Repository) _getOrCreate(args interface{}) (interface{}, error) {
 		if err := metrics.Registry.Register(prometheusData); err != nil {
 			kernel.Logger.Info(fmt.Sprintf("metric %s already exist", prometheusMetric.Name))
 		}
+		metric_db.Create(prometheusMetric.Name, prometheusData)
 		kernel.Logger.Info(fmt.Sprintf("metric %s created", prometheusMetric.Name))
 		return prometheusData, nil
 
@@ -120,8 +74,55 @@ func (p *Repository) _getOrCreate(args interface{}) (interface{}, error) {
 		if err := metrics.Registry.Register(prometheusData); err != nil {
 			kernel.Logger.Info(fmt.Sprintf("metric %s already exist", prometheusMetric.Name))
 		}
+		metric_db.Create(prometheusMetric.Name, prometheusData)
+		return prometheusData, nil
+	case v1beta1.PrometheusMetricTypeGauge:
+		prometheusData := prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: prometheusMetric.Name,
+			Help: prometheusMetric.Help,
+		})
+		if err := metrics.Registry.Register(prometheusData); err != nil {
+			kernel.Logger.Info(fmt.Sprintf("metric %s already exist", prometheusMetric.Name))
+		}
+		metric_db.Create(prometheusMetric.Name, prometheusData)
 		return prometheusData, nil
 	default:
 		return nil, kernel.ErrorInvalidArgument(fmt.Sprintf("metric type %s is not supported", prometheusMetric.Type))
 	}
+}
+
+func (p *Repository) Update(args ...interface{}) (interface{}, error) {
+	if len(args) != 2 && args[0] != nil && reflect.TypeOf(args[1]).Kind() != reflect.Float64 {
+		return nil, kernel.ErrorInvalidArgument("args must be a string and a float64")
+	}
+	metric := args[0]
+	value := args[1].(float64)
+
+	kernel.Logger.Info(fmt.Sprintf("%s metric %s updated, with value %f", args[0].(v1beta1.PrometheusMetric).Type,
+		args[0].(v1beta1.PrometheusMetric).Name, args[1].(float64)))
+
+	switch reflect.TypeOf(metric) {
+	case reflect.TypeOf(prometheus.NewHistogram(prometheus.HistogramOpts{})):
+		histogram := metric.(prometheus.Histogram)
+		histogram.Observe(value)
+	case reflect.TypeOf(prometheus.NewCounter(prometheus.CounterOpts{})):
+		counter := metric.(prometheus.Counter)
+		counter.Add(value)
+	case reflect.TypeOf(prometheus.NewGauge(prometheus.GaugeOpts{})):
+		gauge := metric.(prometheus.Gauge)
+		gauge.Set(value)
+	default:
+		return nil, kernel.ErrorInvalidArgument(
+			fmt.Sprintf(
+				"First arg must be a prometheus metric and not : %s. Accepted: %s or %s",
+				metric, v1beta1.PrometheusMetricTypeCounter, v1beta1.PrometheusMetricTypeHistogram,
+			),
+		)
+	}
+	return metric, nil
+}
+
+func (p *Repository) Delete(i interface{}) error {
+	//TODO implement me
+	panic("implement me")
 }

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: pod
+  name: debug
+  namespace: monitoring
+spec:
+  serviceAccountName: prometheus-stack-grafana
+  containers:
+  - args: ["sleep", "10000000"]
+    image: radial/busyboxplus:curl
+    name: pod
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}

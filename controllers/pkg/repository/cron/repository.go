@@ -2,7 +2,9 @@ package cron
 
 import (
 	"fmt"
+	cron_db "fr.esgi/ha-audit/controllers/pkg/db/cron"
 	"fr.esgi/ha-audit/controllers/pkg/kernel"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/robfig/cron/v3"
 	"reflect"
 	"sync"
@@ -11,6 +13,12 @@ import (
 type Repository struct {
 	Cron *cron.Cron
 }
+type InMemoryPrometheusRepository struct {
+	Id    string
+	Gauge prometheus.Gauge
+}
+
+var InMemoryPrometheusRepositoryInstance []InMemoryPrometheusRepository
 
 var cronRepositoryInstance *Repository
 var mutex = &sync.Mutex{}
@@ -29,7 +37,15 @@ func GetInstance() *Repository {
 }
 
 func (c *Repository) Get(args ...interface{}) (interface{}, error) {
-	panic("implement me")
+	if len(args) != 0 || reflect.TypeOf(args).Kind() != reflect.String {
+		return nil, kernel.ErrorInvalidArgument("the argument must be a string")
+	}
+	for _, metric := range InMemoryPrometheusRepositoryInstance {
+		if metric.Id == args[0].(string) {
+			return metric, nil
+		}
+	}
+	return nil, kernel.ErrorNotFound(fmt.Sprintf("No metric found with id : %s", args[0].(string)))
 }
 
 func (c *Repository) GetAll(i interface{}) ([]interface{}, error) {
@@ -84,7 +100,7 @@ func (c *Repository) Delete(args interface{}) error {
 		return nil
 	}
 
-	c.Cron.Remove(cronID)
+	cron_db.Delete(cronID)
 	return nil
 }
 

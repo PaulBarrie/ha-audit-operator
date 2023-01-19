@@ -8,7 +8,7 @@ import (
 	"github.com/robfig/cron/v3"
 	v1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	time "time"
+	"time"
 )
 
 func (H *HAAuditService) _getStrategyCronFunction(targets []resource_repo.TargetResourcePayload) (func(), error) {
@@ -18,6 +18,7 @@ func (H *HAAuditService) _getStrategyCronFunction(targets []resource_repo.Target
 		if H.CRD.Status.NextChaosDateTime < time.Now().Unix() {
 			return
 		}
+		kernel.Logger.Info(fmt.Sprintf("deleting target %s", target.TargetType))
 		for i := 0; i < H.CRD.Spec.ChaosStrategy.NumberOfPodsToKill; i++ {
 			podToDeleteIndex := rand.IntnRange(0, len(targets))
 			pod := target.Pods[podToDeleteIndex]
@@ -87,7 +88,6 @@ func (H *HAAuditService) _scheduleStrategy() error {
 		kernel.Logger.Error(err, "unable to create cron")
 		return err
 	}
-	kernel.Logger.Info("cron created", "cronId", cronId)
 	H.CRD.Spec.ChaosStrategy.CronId = int(cronId.(cron.EntryID))
 	return nil
 }

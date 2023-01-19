@@ -33,4 +33,4 @@ spec:
   chaosStrategy:
     type: random
     frequencySec: 30
-  testSchedule: 10 # 10 seconds
+  testSchedule: 1 # 10 seconds

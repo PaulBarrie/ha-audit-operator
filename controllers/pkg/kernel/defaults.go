@@ -1,3 +1,7 @@
 package kernel
 
-const DefaultNamespace = "default"
+var DefaultNamespace = "default"
+
+func SetDefaultNamespace(ns string) {
+	DefaultNamespace = ns
+}

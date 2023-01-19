@@ -15,7 +15,7 @@ metadata:
   namespace: system
 spec:
   endpoints:
-    - path: /metrics
+    - path: /metric
       port: https
       scheme: https
       bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token

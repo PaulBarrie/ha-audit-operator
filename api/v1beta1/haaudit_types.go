@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"fr.esgi/ha-audit/controllers/pkg/kernel"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/robfig/cron/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
@@ -92,14 +93,25 @@ type HAAuditSpec struct {
 	Report HAReport `json:"report"`
 }
 
+type StrategyStatus struct {
+	Cron   cron.EntryID     `json:"cron"`
+	Metric prometheus.Gauge `json:"metric"`
+}
+
+type TestStatus struct {
+	CronID cron.EntryID     `json:"cron"`
+	Metric prometheus.Gauge `json:"metric"`
+}
+
 // HAAuditStatus defines the observed state of HAAudit
 type HAAuditStatus struct {
-	TestReportCronId             cron.EntryID       `json:"testCronId"`
-	StrategyCronId               cron.EntryID       `json:"stratCronId"`
+	ChaosStrategyCron            cron.EntryID       `json:"chaosStrategyCron"`
+	TestReportCron               cron.EntryID       `json:"testReportCron"`
 	RoundRobinStrategy           RoundRobinStrategy `json:"roundRobinStrategy,omitempty"`
 	FixedStrategy                FixedStrategy      `json:"fixedStrategy,omitempty"`
 	PrometheusClusterRoleBinding NamespacedName     `json:"prometheusClusterRoleBinding"`
 	NextChaosDateTime            int64              `json:"nextChaosDateTime"`
+	Created                      bool               `json:"created,default=false"`
 }
 
 //+kubebuilder:object:root=true
@@ -109,9 +121,8 @@ type HAAuditStatus struct {
 type HAAudit struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   HAAuditSpec   `json:"spec,omitempty"`
-	Status HAAuditStatus `json:"status,omitempty"`
+	Spec              HAAuditSpec   `json:"spec,omitempty"`
+	Status            HAAuditStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

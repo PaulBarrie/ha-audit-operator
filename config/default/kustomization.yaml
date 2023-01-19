@@ -27,8 +27,8 @@ bases:
 - ../prometheus
 
 patchesStrategicMerge:
-# Protect the /metrics endpoint by putting it behind auth.
-# If you want your controller-manager to expose the /metrics
+# Protect the /metric endpoint by putting it behind auth.
+# If you want your controller-manager to expose the /metric
 # endpoint w/o any authn/z, please comment the following line.
 - manager_auth_proxy_patch.yaml
 

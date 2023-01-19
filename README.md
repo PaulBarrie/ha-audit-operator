@@ -70,6 +70,10 @@ make run
 
 **NOTE:** You can also run this in one step by running: `make install run`
 
+3. Test metric endpoints:
+```sh
+
+```
 ### Modifying the API definitions
 If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
 

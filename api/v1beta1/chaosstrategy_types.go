@@ -15,8 +15,6 @@ type ChaosStrategy struct {
 	NumberOfPodsToKill int `json:"numberOfPodsToKill"`
 	// +kubebuilder:default=30
 	FrequencySeconds int64 `json:"frequencySec"`
-	// +kubebuilder:validation:Optional
-	CronId int `json:"chaosCronId"`
 }
 
 func (c *ChaosStrategy) Default() {
