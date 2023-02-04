@@ -1,32 +1,31 @@
 apiVersion: apps.fr.esgi/v1beta1
 kind: HAAudit
 metadata:
+  namespace: default
   labels:
     app.kubernetes.io/name: haaudit
     app.kubernetes.io/instance: haaudit-sample
     app.kubernetes.io/part-of: ha-audit-operator
-    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: ha-audit-operator
-  name: haaudit-sample
+
+  name: haaudit-test
 spec:
   report:
     prometheus:
-      address: "prometheus-prometheus-pushgateway.default.svc.cluster.local"
-      serviceAccount:
-        name: "prometheus-prometheus-pushgateway"
-        namespace: "default"
+      dumpFrequency: 10
   targets:
     - name: "instance-1-api-ha-test"
-      kind: "deployment"
+      resourceType: "deployment"
       namespace: "default"
       path: "instance-1-api-ha-test.default.svc.cluster.local/ping"
-    - kind: "pod"
+    - resourceType: "pod"
       labelSelector:
         matchLabels:
           app: "instance-2-api-ha-test"
       namespace: "default"
       path: "instance-2-api-ha-test.default.svc.cluster.local/ping"
-    - kind: "pod"
+    - resourceType: "pod"
       nameRegex: "instance-3-api-ha-test-.*"
       namespace: "default"
       path: "instance-3-api-ha-test.default.svc.cluster.local/ping"

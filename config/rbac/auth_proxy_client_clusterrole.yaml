@@ -11,6 +11,6 @@ metadata:
   name: metrics-reader
 rules:
 - nonResourceURLs:
-  - "/metric"
+  - "/metrics-audit"
   verbs:
   - get

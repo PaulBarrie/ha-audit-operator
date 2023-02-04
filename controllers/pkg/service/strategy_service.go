@@ -71,23 +71,23 @@ func (H *HAAuditService) _getStrategyCronFunction(targets []resource_repo.Target
 	return cronFunction, nil
 }
 
-func (H *HAAuditService) _scheduleStrategy() error {
+func (H *HAAuditService) _scheduleStrategy() (error, cron.EntryID) {
 	kernel.Logger.Info("scheduling strategy")
 	targets, err := H._acquireTargets()
 	if err != nil || len(targets) == 0 {
 		kernel.Logger.Error(err, "unable to get targets")
-		return err
+		return err, cron.EntryID(0)
 	}
 	cronFunc, err := H._getStrategyCronFunction(targets)
 	if err != nil {
 		kernel.Logger.Error(err, "unable to get cron function")
-		return err
+		return err, cron.EntryID(0)
 	}
 	cronId, err := H.CronRepository.Create(int(H.CRD.Spec.ChaosStrategy.FrequencySeconds), cronFunc)
 	if err != nil {
 		kernel.Logger.Error(err, "unable to create cron")
-		return err
+		return err, cron.EntryID(0)
 	}
-	H.CRD.Spec.ChaosStrategy.CronId = int(cronId.(cron.EntryID))
-	return nil
+	idCron := cronId.(cron.EntryID)
+	return nil, idCron
 }

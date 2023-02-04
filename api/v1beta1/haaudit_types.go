@@ -19,7 +19,6 @@ package v1beta1
 import (
 	"fr.esgi/ha-audit/controllers/pkg/kernel"
 	"github.com/google/uuid"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/robfig/cron/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
@@ -45,8 +44,9 @@ var (
 type Target struct {
 	// +kubebuilder:validation:Optional
 	Id string `json:"id"`
-	// +kubebuilder:validation=Required
-	Kind AuditTargetType `json:"kind"`
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default="deployment"
+	ResourceType string `json:"resourceType,omitempty"`
 	// +kubebuilder:validation:Optional
 	Name string `json:"name"`
 	// +kubebuilder:validation:Optional
@@ -69,6 +69,9 @@ func (t *Target) Default(namespace string) Target {
 			kernel.Logger.Error(err, "Error while generating UUID")
 		}
 		t.Id = id.String()
+	}
+	if t.ResourceType == "" {
+		t.ResourceType = string(DeploymentTarget)
 	}
 	if !strings.HasPrefix(t.Path, DefaultPathPrefix) {
 		t.Path = DefaultPathPrefix + t.Path
@@ -93,25 +96,26 @@ type HAAuditSpec struct {
 	Report HAReport `json:"report"`
 }
 
-type StrategyStatus struct {
-	Cron   cron.EntryID     `json:"cron"`
-	Metric prometheus.Gauge `json:"metric"`
+type TestStatus struct {
+	CronID          cron.EntryID `json:"cron"`
+	TotalUpMetricID string       `json:"totalUpMetric"`
+	RateUpMetricID  string       `json:"rateUpMetric"`
 }
 
-type TestStatus struct {
-	CronID cron.EntryID     `json:"cron"`
-	Metric prometheus.Gauge `json:"metric"`
+type MetricStatus struct {
+	TotalUpMetricID string `json:"totalUpMetric"`
+	RateUpMetricID  string `json:"rateUpMetric"`
 }
 
 // HAAuditStatus defines the observed state of HAAudit
 type HAAuditStatus struct {
-	ChaosStrategyCron            cron.EntryID       `json:"chaosStrategyCron"`
-	TestReportCron               cron.EntryID       `json:"testReportCron"`
-	RoundRobinStrategy           RoundRobinStrategy `json:"roundRobinStrategy,omitempty"`
-	FixedStrategy                FixedStrategy      `json:"fixedStrategy,omitempty"`
-	PrometheusClusterRoleBinding NamespacedName     `json:"prometheusClusterRoleBinding"`
-	NextChaosDateTime            int64              `json:"nextChaosDateTime"`
-	Created                      bool               `json:"created,default=false"`
+	ChaosStrategyCron  cron.EntryID       `json:"chaosStrategyCron,omitempty"`
+	TestStatus         TestStatus         `json:"testStatus,omitempty"`
+	MetricStatus       MetricStatus       `json:"metricStatus,omitempty"`
+	RoundRobinStrategy RoundRobinStrategy `json:"roundRobinStrategy,omitempty"`
+	FixedStrategy      FixedStrategy      `json:"fixedStrategy,omitempty"`
+	NextChaosDateTime  int64              `json:"nextChaosDateTime,omitempty"`
+	Created            bool               `json:"created,default=false"`
 }
 
 //+kubebuilder:object:root=true

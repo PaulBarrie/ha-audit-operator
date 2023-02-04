@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"os"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -100,7 +101,10 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
+	if err = mgr.AddMetricsExtraHandler("/metrics-audit", promhttp.Handler()); err != nil {
+		setupLog.Error(err, "unable to add metrics handler")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

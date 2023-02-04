@@ -54,8 +54,6 @@ spec:
                 properties:
                   prometheus:
                     properties:
-                      address:
-                        type: string
                       dumpFrequency:
                         default: 10
                         type: integer
@@ -85,18 +83,8 @@ spec:
                         - name
                         - type
                         type: object
-                      serviceAccount:
-                        properties:
-                          name:
-                            type: string
-                          namespace:
-                            type: string
-                        required:
-                        - name
-                        - namespace
-                        type: object
                     required:
-                    - address
+                    - dumpFrequency
                     type: object
                 required:
                 - prometheus
@@ -105,8 +93,6 @@ spec:
                 items:
                   properties:
                     id:
-                      type: string
-                    kind:
                       type: string
                     labelSelector:
                       description: A label selector is a label query over a set of
@@ -164,8 +150,10 @@ spec:
                       type: string
                     path:
                       type: string
+                    resourceType:
+                      default: deployment
+                      type: string
                   required:
-                  - kind
                   - path
                   type: object
                 minItems: 1
@@ -182,6 +170,9 @@ spec:
           status:
             description: HAAuditStatus defines the observed state of HAAudit
             properties:
+              chaosStrategyCron:
+                description: EntryID identifies an entry within a Cron instance
+                type: integer
               created:
                 type: boolean
               fixedStrategy:
@@ -198,26 +189,19 @@ spec:
                       type: object
                     type: array
                 type: object
+              metricStatus:
+                properties:
+                  rateUpMetric:
+                    type: string
+                  totalUpMetric:
+                    type: string
+                required:
+                - rateUpMetric
+                - totalUpMetric
+                type: object
               nextChaosDateTime:
                 format: int64
                 type: integer
-              prometheusClusterRoleBinding:
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                required:
-                - name
-                - namespace
-                type: object
-              rateMetrics:
-                description: GaugeVec is a Collector that bundles a set of Gauges
-                  that all share the same Desc, but have different values for their
-                  variable labels. This is used if you want to count the same thing
-                  partitioned by various dimensions (e.g. number of operations queued,
-                  partitioned by user and operation type). Create instances with NewGaugeVec.
-                type: object
               roundRobinStrategy:
                 properties:
                   currentTarget:
@@ -235,27 +219,22 @@ spec:
                       type: object
                     type: array
                 type: object
-              strategyCronID:
-                description: EntryID identifies an entry within a Cron instance
-                type: integer
-              testCronID:
-                description: EntryID identifies an entry within a Cron instance
-                type: integer
-              totalMetrics:
-                description: GaugeVec is a Collector that bundles a set of Gauges
-                  that all share the same Desc, but have different values for their
-                  variable labels. This is used if you want to count the same thing
-                  partitioned by various dimensions (e.g. number of operations queued,
-                  partitioned by user and operation type). Create instances with NewGaugeVec.
+              testStatus:
+                properties:
+                  cron:
+                    description: EntryID identifies an entry within a Cron instance
+                    type: integer
+                  rateUpMetric:
+                    type: string
+                  totalUpMetric:
+                    type: string
+                required:
+                - cron
+                - rateUpMetric
+                - totalUpMetric
                 type: object
             required:
             - created
-            - nextChaosDateTime
-            - prometheusClusterRoleBinding
-            - rateMetrics
-            - strategyCronID
-            - testCronID
-            - totalMetrics
             type: object
         type: object
     served: true

@@ -31,11 +31,6 @@ type PrometheusMetric struct {
 }
 
 type PrometheusReport struct {
-	// +kubebuilder:validation:Required
-	Address string `json:"address"`
-	// +kubebuilder:validation:Optional
-	ServiceAccount ServiceAccount `json:"serviceAccount"`
-	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=10
 	DumpFrequencySeconds int `json:"dumpFrequency"`
 	// +kubebuilder:validation:Optional
@@ -57,7 +52,7 @@ func (p *PrometheusReport) Get(name string, rate int) PrometheusReport {
 
 func DefaultTotalRunningInstanceMetric(name string, rate int) *PrometheusMetric {
 	return &PrometheusMetric{
-		Type: PrometheusMetricTypeGauge,
+		Type: PrometheusMetricTypeHistogram,
 		Name: fmt.Sprintf(
 			"%s_total_running_instance_seconds",
 			strings.ReplaceAll(name, "-", "_"),
@@ -72,7 +67,7 @@ func DefaultTotalRunningInstanceMetric(name string, rate int) *PrometheusMetric 
 
 func DefaultTotalRunningInstanceRateMetric(name string, rate int) *PrometheusMetric {
 	return &PrometheusMetric{
-		Type: PrometheusMetricTypeGauge,
+		Type: PrometheusMetricTypeHistogram,
 		Name: fmt.Sprintf("%s_rate_running_instance_seconds", strings.ReplaceAll(name, "-", "_")),
 		Help: fmt.Sprintf(
 			"The running instance rate for %s report recorded every %d seconds",

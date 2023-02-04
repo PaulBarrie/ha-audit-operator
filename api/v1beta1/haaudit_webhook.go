@@ -19,7 +19,6 @@ package v1beta1
 import (
 	"fmt"
 	"k8s.io/apimachinery/pkg/runtime"
-	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -83,16 +82,9 @@ func (r *HAAudit) _validateCRD() error {
 		if target.Name == "" && target.Namespace == "" && target.NameRegex == "" {
 			return fmt.Errorf("target name cannot be empty")
 		}
-		if target.Kind == "" {
-			return fmt.Errorf("target kind cannot be empty")
-		}
 		if target.Namespace == "" {
 			return fmt.Errorf("target namespace cannot be empty")
 		}
-	}
-
-	if reflect.DeepEqual(r.Spec.Report.PrometheusReport, HAReport{}) || r.Spec.Report.PrometheusReport.Address == "" {
-		return fmt.Errorf(fmt.Sprintf("prometheus report cannot be set with address %s", r.Spec.Report.PrometheusReport.Address))
 	}
 	return nil
 }

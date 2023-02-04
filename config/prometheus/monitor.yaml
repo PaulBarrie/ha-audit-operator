@@ -15,7 +15,7 @@ metadata:
   namespace: system
 spec:
   endpoints:
-    - path: /metric
+    - path: /metrics-audit
       port: https
       scheme: https
       bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -24,3 +24,4 @@ spec:
   selector:
     matchLabels:
       control-plane: controller-manager
+

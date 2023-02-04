@@ -24,11 +24,13 @@ import (
 	"fr.esgi/ha-audit/controllers/pkg/kernel"
 	ha_service "fr.esgi/ha-audit/controllers/pkg/service"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	_ "sigs.k8s.io/controller-runtime/examples/crd/pkg"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -64,8 +66,7 @@ func (r *HAAuditReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	kernel.Logger.WithValues("Namespace", req.NamespacedName)
 	haAudit := v1beta1.HAAudit{}
 	if err := r.Get(ctx, req.NamespacedName, &haAudit); err != nil {
-		kernel.Logger.Info(fmt.Sprintf("unable to fetch HA Audit CRD: %v", err))
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	var service *ha_service.HAAuditService
 	service = ha_service.New(r.Client, ctx, &haAudit)
@@ -73,6 +74,7 @@ func (r *HAAuditReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	//https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html
 	isUnderDeletion := !(haAudit.ObjectMeta.DeletionTimestamp.IsZero())
 	thereIsFinalizer := controllerutil.ContainsFinalizer(&haAudit, finalizerName)
+
 	if isUnderDeletion {
 		kernel.Logger.Info("Deleting HA Audit CRD")
 		if thereIsFinalizer {
@@ -95,13 +97,25 @@ func (r *HAAuditReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 	kernel.Logger.Info("Reconciling HA Audit CRD")
-	err := service.CreateOrUpdate()
+	err, upCRD := service.CreateOrUpdate()
+	kernel.Logger.Info(fmt.Sprintf("TOUP_HA: %v", upCRD.Status))
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-
+	if err = r.Client.Update(ctx, upCRD); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	if err = r.Status().Update(ctx, upCRD); err != nil {
+		return reconcile.Result{}, client.IgnoreNotFound(err)
+	}
+	kernel.Logger.Info(fmt.Sprintf("HA Audit CRD reconciled : %v", upCRD.Status))
+	Payload := `{ "op": "replace", "path": "/status/created","value": "true"}`
+	bytePayload := []byte(Payload)
+	err = r.Patch(ctx, upCRD, client.RawPatch(types.MergePatchType, bytePayload))
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{}, nil
-
 }
 
 // SetupWithManager sets up the controller with the Manager.

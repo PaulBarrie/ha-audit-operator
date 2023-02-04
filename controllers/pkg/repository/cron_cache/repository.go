@@ -1,8 +1,7 @@
-package cron
+package cron_cache
 
 import (
 	"fmt"
-	cron_db "fr.esgi/ha-audit/controllers/pkg/db/cron"
 	"fr.esgi/ha-audit/controllers/pkg/kernel"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/robfig/cron/v3"
@@ -36,7 +35,7 @@ func GetInstance() *Repository {
 	return cronRepositoryInstance
 }
 
-func (c *Repository) Get(args ...interface{}) (interface{}, error) {
+func (r *Repository) Get(args ...interface{}) (interface{}, error) {
 	if len(args) != 0 || reflect.TypeOf(args).Kind() != reflect.String {
 		return nil, kernel.ErrorInvalidArgument("the argument must be a string")
 	}
@@ -48,16 +47,16 @@ func (c *Repository) Get(args ...interface{}) (interface{}, error) {
 	return nil, kernel.ErrorNotFound(fmt.Sprintf("No metric found with id : %s", args[0].(string)))
 }
 
-func (c *Repository) GetAll(i interface{}) ([]interface{}, error) {
+func (r *Repository) GetAll(i interface{}) ([]interface{}, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c *Repository) Create(args ...interface{}) (interface{}, error) {
+func (r *Repository) Create(args ...interface{}) (interface{}, error) {
 	if len(args) != 2 && reflect.TypeOf(args[0]).Kind() != reflect.Int && reflect.TypeOf(args[1]).Kind() != reflect.Func {
 		return nil, kernel.ErrorInvalidArgument("args must be a string and a func")
 	}
-	id, err := c.Cron.AddFunc(
+	id, err := r.Cron.AddFunc(
 		fmt.Sprintf(
 			"@every %ds", args[0].(int)),
 		args[1].(func()),
@@ -66,13 +65,13 @@ func (c *Repository) Create(args ...interface{}) (interface{}, error) {
 		kernel.Logger.Error(err, "unable to add func to cron")
 		return nil, err
 	}
-	c.Cron.Start()
-	go c.Cron.Run()
+	r.Cron.Start()
+	go r.Cron.Run()
 
 	return id, nil
 }
 
-func (c *Repository) Update(args ...interface{}) (interface{}, error) {
+func (r *Repository) Update(args ...interface{}) (interface{}, error) {
 	if len(args) != 2 &&
 		reflect.TypeOf(args[0]).Kind() != reflect.Int &&
 		reflect.TypeOf(args[1]) != reflect.TypeOf(Payload{}) {
@@ -81,16 +80,19 @@ func (c *Repository) Update(args ...interface{}) (interface{}, error) {
 	newCron := args[1].(Payload)
 	oldCronId := args[0].(int)
 
-	c.Cron.Remove(cron.EntryID(oldCronId))
-	cronId, err := c.Create(_getSeconds(newCron.FrequencySec), newCron.Function)
+	r.Cron.Remove(cron.EntryID(oldCronId))
+	cronId, err := r.Create(_getSeconds(newCron.FrequencySec), newCron.Function)
 	if err != nil {
 		kernel.Logger.Error(err, "unable to update cron")
 		return cronId, err
 	}
+	r.Cron.Start()
+	go r.Cron.Run()
+	GetDB().Update(cron.EntryID(oldCronId), newCron)
 	return cronId, nil
 }
 
-func (c *Repository) Delete(args interface{}) error {
+func (r *Repository) Delete(args interface{}) error {
 	if reflect.TypeOf(args) != reflect.TypeOf(cron.EntryID(0)) {
 		return kernel.ErrorInvalidArgument("args must be an cron.EntryID")
 	}
@@ -99,8 +101,6 @@ func (c *Repository) Delete(args interface{}) error {
 		kernel.Logger.Info("cron not found", "cronID", cronID)
 		return nil
 	}
-
-	cron_db.Delete(cronID)
 	return nil
 }
 

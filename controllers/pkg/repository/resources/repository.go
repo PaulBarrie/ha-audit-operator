@@ -49,20 +49,20 @@ func (r *ResourceRepository) Get(target v1beta1.Target) (TargetResourcePayload, 
 	var pods []v1api.Pod
 	var err error
 	if target.Name != "" {
-		pods, err = r._getResource(GetResourceTypePayload(target.Kind), target.Namespace, target.Name)
+		pods, err = r._getResource(GetResourceTypePayload(v1beta1.AuditTargetType(target.ResourceType)), target.Namespace, target.Name)
 	} else if !reflect.DeepEqual(target.LabelSelector, map[string]string{}) {
-		pods, err = r._getResource(GetResourceTypePayload(target.Kind), target.Namespace, target.LabelSelector)
+		pods, err = r._getResource(GetResourceTypePayload(v1beta1.AuditTargetType(target.ResourceType)), target.Namespace, target.LabelSelector)
 	} else if target.NameRegex != "" {
-		pods, err = r._getResource(GetResourceTypePayload(target.Kind), target.Namespace, target.NameRegex, true)
+		pods, err = r._getResource(GetResourceTypePayload(v1beta1.AuditTargetType(target.ResourceType)), target.Namespace, target.NameRegex, true)
 	} else {
-		pods, err = r._getResource(GetResourceTypePayload(target.Kind), target.Namespace)
+		pods, err = r._getResource(GetResourceTypePayload(v1beta1.AuditTargetType(target.ResourceType)), target.Namespace)
 	}
 	if err != nil {
 		return TargetResourcePayload{}, err
 	}
 	return TargetResourcePayload{
 		Id:         target.Id,
-		TargetType: target.Kind,
+		TargetType: v1beta1.AuditTargetType(target.ResourceType),
 		Pods:       pods,
 	}, nil
 }

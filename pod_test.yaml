@@ -1,17 +1,32 @@
 apiVersion: v1
 kind: Pod
 metadata:
+  creationTimestamp: null
   labels:
-    run: pod
-  name: debug
+    run: test
+  name: test
   namespace: monitoring
 spec:
-  serviceAccountName: prometheus-stack-grafana
+  serviceAccountName: prometheus-stack-kube-prom-prometheus
   containers:
-  - args: ["sleep", "10000000"]
-    image: radial/busyboxplus:curl
-    name: pod
+  - image: yauritux/busybox-curl
+    name: test
+    command:
+      - "sleep"
+      - "3600"
     resources: {}
+    volumeMounts:
+      - mountPath: /home
+        name: kube-api-access
+  volumes:
+    - name: kube-api-access
+      projected:
+        sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 3607
+
   dnsPolicy: ClusterFirst
   restartPolicy: Always
-status: {}
+
+#curl --insecure -H "Accept: application/json" -H "Authorization: Bearer $(cat /home/token)" https://ha-audit-operator-controller-manager-metrics-service.ha-audit-operator-system.svc.cluster.local:8443/metrics-audit

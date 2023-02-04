@@ -1,8 +1,15 @@
-# ha-audit-operator
-// TODO(user): Add simple overview of use/purpose
+# HA Audit operator
+
+This operator allows you to audit your HA cluster for issues and report them as Prometheus metrics.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+Before launching the operator you need to make sure the targets you aim to provide in the CRD actually match the targets 
+you want to perform HA Audit. If you just want to test before, you can find in this
+[repository](https://github.com/PaulBarrie/ha-operator-test) an helm chart that will install dependent components 
+and the Prometheus Stack.
+
+You will be then able to create a CRD and see the metrics in the Prometheus UI. You will find an example of the CRD in 
+the `config/samples` folder. Please follow the *Running on the cluster* section for more details.
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
