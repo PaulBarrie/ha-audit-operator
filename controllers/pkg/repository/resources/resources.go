@@ -14,6 +14,9 @@ type TargetResourcePayload struct {
 	Pods       []v1api.Pod
 	Id         string
 }
+
+type TargetResourceList []TargetResourcePayload
+
 type ResourceTypePayload struct {
 	Kind       string
 	ApiVersion string

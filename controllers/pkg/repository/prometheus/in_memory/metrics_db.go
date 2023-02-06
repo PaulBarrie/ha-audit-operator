@@ -1,9 +1,7 @@
 package in_memory
 
 import (
-	"fmt"
 	"fr.esgi/ha-audit/api/v1beta1"
-	"fr.esgi/ha-audit/controllers/pkg/kernel"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"reflect"
@@ -28,7 +26,6 @@ func Create(name string, metric interface{}) string {
 	emptyGauge := prometheus.NewGauge(prometheus.GaugeOpts{})
 	emptyHistogram := prometheus.NewHistogram(prometheus.HistogramOpts{})
 	emptyCounter := prometheus.NewCounter(prometheus.CounterOpts{})
-	kernel.Logger.Info(fmt.Sprintf("Metric type : %v - Histo : %v", strings.ToLower(reflect.TypeOf(metric).String()), strings.ToLower(reflect.TypeOf(&emptyHistogram).String())))
 	if strings.ToLower(reflect.TypeOf(metric).String()) == strings.ToLower(reflect.TypeOf(&emptyGauge).String()) {
 		entry = DBEntry{
 			Id:          id.String(),
@@ -36,7 +33,6 @@ func Create(name string, metric interface{}) string {
 			GaugeMetric: metric.(prometheus.Gauge),
 		}
 	} else if strings.ToLower(reflect.TypeOf(metric).String()) == strings.ToLower(reflect.TypeOf(&emptyHistogram).String()) {
-		kernel.Logger.Info(fmt.Sprintf("Metric type Histo : %v", reflect.TypeOf(metric)))
 		entry = DBEntry{
 			Id:              id.String(),
 			Name:            name,
@@ -50,17 +46,12 @@ func Create(name string, metric interface{}) string {
 		}
 	}
 	MetricDB = append(MetricDB, entry)
-	kernel.Logger.Info(fmt.Sprintf("DB : %v", MetricDB))
 	return id.String()
 }
 
 func Update(id string, metric float64) {
 	for _, e := range MetricDB {
-		//kernel.Logger.Info(fmt.Sprintf("ID : %s", id))
 		if e.Id == id {
-			kernel.Logger.Info(fmt.Sprintf("Gauge : %v", e.GaugeMetric))
-			kernel.Logger.Info(fmt.Sprintf("Count : %v", e.CounterMetric))
-			kernel.Logger.Info(fmt.Sprintf("Histo : %v", e.HistogramMetric))
 			if e.GaugeMetric != nil {
 				e.GaugeMetric.Set(metric)
 			} else if e.HistogramMetric != nil {

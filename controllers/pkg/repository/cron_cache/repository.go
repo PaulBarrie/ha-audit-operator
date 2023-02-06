@@ -66,8 +66,6 @@ func (r *Repository) Create(args ...interface{}) (interface{}, error) {
 		return nil, err
 	}
 	r.Cron.Start()
-	go r.Cron.Run()
-
 	return id, nil
 }
 
@@ -87,7 +85,6 @@ func (r *Repository) Update(args ...interface{}) (interface{}, error) {
 		return cronId, err
 	}
 	r.Cron.Start()
-	go r.Cron.Run()
 	GetDB().Update(cron.EntryID(oldCronId), newCron)
 	return cronId, nil
 }

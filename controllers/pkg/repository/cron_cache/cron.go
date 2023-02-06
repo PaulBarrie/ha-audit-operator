@@ -9,8 +9,3 @@ type Payload struct {
 }
 
 type CronType string
-
-const (
-	CronChaosStrategy CronType = "chaosStrategy"
-	CronReport        CronType = "report"
-)

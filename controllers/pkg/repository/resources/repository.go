@@ -50,11 +50,13 @@ func (r *ResourceRepository) Get(target v1beta1.Target) (TargetResourcePayload, 
 	var err error
 	if target.Name != "" {
 		pods, err = r._getResource(GetResourceTypePayload(v1beta1.AuditTargetType(target.ResourceType)), target.Namespace, target.Name)
-	} else if !reflect.DeepEqual(target.LabelSelector, map[string]string{}) {
+	} else if !reflect.DeepEqual(target.LabelSelector, metav1.LabelSelector{}) {
 		pods, err = r._getResource(GetResourceTypePayload(v1beta1.AuditTargetType(target.ResourceType)), target.Namespace, target.LabelSelector)
 	} else if target.NameRegex != "" {
+		kernel.Logger.Info(fmt.Sprintf("Get resources with name regex: %s", target.NameRegex))
 		pods, err = r._getResource(GetResourceTypePayload(v1beta1.AuditTargetType(target.ResourceType)), target.Namespace, target.NameRegex, true)
 	} else {
+		kernel.Logger.Info("Get all resources")
 		pods, err = r._getResource(GetResourceTypePayload(v1beta1.AuditTargetType(target.ResourceType)), target.Namespace)
 	}
 	if err != nil {
@@ -67,8 +69,8 @@ func (r *ResourceRepository) Get(target v1beta1.Target) (TargetResourcePayload, 
 	}, nil
 }
 
-func (r *ResourceRepository) GetAll(targets []v1beta1.Target) ([]TargetResourcePayload, error) {
-	var res []TargetResourcePayload
+func (r *ResourceRepository) GetAll(targets []v1beta1.Target) (TargetResourceList, error) {
+	var res TargetResourceList
 	for _, target := range targets {
 		targetResource, err := r.Get(target)
 		if err != nil {
@@ -92,8 +94,11 @@ func (r *ResourceRepository) _getResource(resourceId schema.GroupVersionResource
 	[]v1api.Pod, error) {
 	var options = metav1.ListOptions{}
 	var res []v1api.Pod
-	// Default: find in all the namespace
-	// Find with name
+
+	searchByName := len(opts) == 1 && reflect.TypeOf(opts[0]).Kind() == reflect.String
+	searchByLabelSelector := len(opts) == 1 && reflect.TypeOf(opts[0]) == reflect.TypeOf(metav1.LabelSelector{})
+	searchByNameRegex := len(opts) == 2 && reflect.TypeOf(opts[0]).Kind() == reflect.String && reflect.TypeOf(opts[1]).Kind() == reflect.Bool
+	// If not pod resource, _getResource with label selector name ="resourceName-*" regex
 	if resourceId.Resource != string(PodResourceAPIName) {
 		return r._getResource(
 			GetResourceTypePayload(v1beta1.PodTarget),
@@ -101,17 +106,16 @@ func (r *ResourceRepository) _getResource(resourceId schema.GroupVersionResource
 			fmt.Sprintf("%s-*", opts[0].(string)),
 			true,
 		)
-	} else if len(opts) == 1 && reflect.TypeOf(opts[0]).Kind() == reflect.String {
+	} else if searchByName {
 		options = metav1.ListOptions{
 			FieldSelector: fmt.Sprintf("metadata.name=%s", opts[0]),
 		}
-	} else if len(opts) == 1 && reflect.TypeOf(opts[0]).Kind() == reflect.Map { // Find with label selector
+	} else if searchByLabelSelector { // Find with label selector
+		labelSelector := opts[0].(metav1.LabelSelector)
 		options = metav1.ListOptions{
-			LabelSelector: metav1.FormatLabelSelector(&metav1.LabelSelector{
-				MatchLabels: opts[0].(map[string]string),
-			}),
+			LabelSelector: metav1.FormatLabelSelector(&labelSelector),
 		}
-	} else if len(opts) == 2 && opts[0] != nil && reflect.TypeOf(opts[0]).Kind() == reflect.String && opts[1].(bool) {
+	} else if searchByNameRegex {
 		podList, err := r.getPodsFromRegex(namespace, opts[0].(string))
 		if err != nil {
 			return []v1api.Pod{}, err
@@ -119,17 +123,17 @@ func (r *ResourceRepository) _getResource(resourceId schema.GroupVersionResource
 		for _, pod := range podList {
 			res = _appendOnce(res, pod)
 		}
+		return res, nil
 	}
+	return r._getGenericResource(namespace, resourceId, options)
+}
 
+func (r *ResourceRepository) _getGenericResource(namespace string, resourceId schema.GroupVersionResource, options metav1.ListOptions) ([]v1api.Pod, error) {
 	var list *unstructured.UnstructuredList
 	var err error
-	if reflect.DeepEqual(options, metav1.ListOptions{}) {
-		list, err = DynamicConfig.Resource(resourceId).Namespace(namespace).
-			List(r.Context, metav1.ListOptions{})
-	} else {
-		list, err = DynamicConfig.Resource(resourceId).Namespace(namespace).List(r.Context, options)
-	}
-
+	var res []v1api.Pod
+	kernel.Logger.Info(fmt.Sprintf("Get resource %v with options %v in %s namespace", resourceId, options, namespace))
+	list, err = DynamicConfig.Resource(resourceId).Namespace(namespace).List(r.Context, options)
 	if err != nil {
 		kernel.Logger.Error(err, fmt.Sprintf("Cannot get resource %v with options %v in %s namespace", resourceId, options, namespace))
 		return []v1api.Pod{}, err
@@ -137,7 +141,7 @@ func (r *ResourceRepository) _getResource(resourceId schema.GroupVersionResource
 
 	for _, item := range list.Items {
 		pod := v1api.Pod{}
-		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &item); err != nil {
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &pod); err != nil {
 			return []v1api.Pod{}, err
 		}
 
@@ -145,7 +149,9 @@ func (r *ResourceRepository) _getResource(resourceId schema.GroupVersionResource
 			kernel.Logger.Error(err, "error while getting pod from unstructured")
 			continue
 		}
-		res = _appendOnce(res, pod)
+		if pod.GetName() != "" {
+			res = append(res, pod)
+		}
 	}
 	return res, nil
 }

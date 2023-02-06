@@ -8,12 +8,13 @@ import (
 	"net/http"
 )
 
-func (H *HAAuditService) _acquireTargets() ([]resource_repo.TargetResourcePayload, error) {
-	get, err := H.ResourceRepository.GetAll(H.CRD.Spec.Targets)
+func (H *HAAuditService) _acquireTargets(crd *v1beta1.HAAudit) ([]resource_repo.TargetResourcePayload, error) {
+	get, err := H.ResourceRepository.GetAll(crd.Spec.Targets)
 	if err != nil {
 		kernel.Logger.Error(err, "unable to get targets")
 		return []resource_repo.TargetResourcePayload{}, err
 	}
+
 	return get, nil
 }
 
@@ -29,11 +30,11 @@ func _testTarget(target v1beta1.Target) (bool, error) {
 	return true, nil
 }
 
-func (H *HAAuditService) _inferTargets() []v1beta1.Target {
+func (H *HAAuditService) _inferTargets(crd *v1beta1.HAAudit) []v1beta1.Target {
 	var inferredTargets []v1beta1.Target
-	for _, target := range H.CRD.Spec.Targets {
+	for _, target := range crd.Spec.Targets {
 		if target.Id == "" || target.Path == "" || target.Name == "" {
-			inferredTargets = append(inferredTargets, target.Default(H.CRD.ObjectMeta.Namespace))
+			inferredTargets = append(inferredTargets, target.Default(crd.ObjectMeta.Namespace))
 		}
 	}
 	return inferredTargets

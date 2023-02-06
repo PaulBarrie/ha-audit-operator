@@ -8,7 +8,6 @@ metadata:
     app.kubernetes.io/part-of: ha-audit-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: ha-audit-operator
-
   name: haaudit-test
 spec:
   report:
@@ -22,7 +21,8 @@ spec:
     - resourceType: "pod"
       labelSelector:
         matchLabels:
-          app: "instance-2-api-ha-test"
+          app.kubernetes.io/instance: "instance-2"
+          app.kubernetes.io/name: "api-ha-test"
       namespace: "default"
       path: "instance-2-api-ha-test.default.svc.cluster.local/ping"
     - resourceType: "pod"
@@ -31,5 +31,5 @@ spec:
       path: "instance-3-api-ha-test.default.svc.cluster.local/ping"
   chaosStrategy:
     type: random
-    frequencySec: 30
+    frequencySec: 10
   testSchedule: 1 # 10 seconds

@@ -57,32 +57,6 @@ spec:
                       dumpFrequency:
                         default: 10
                         type: integer
-                      instanceUp:
-                        properties:
-                          help:
-                            type: string
-                          name:
-                            type: string
-                          type:
-                            type: string
-                        required:
-                        - help
-                        - name
-                        - type
-                        type: object
-                      instanceUpRate:
-                        properties:
-                          help:
-                            type: string
-                          name:
-                            type: string
-                          type:
-                            type: string
-                        required:
-                        - help
-                        - name
-                        - type
-                        type: object
                     required:
                     - dumpFrequency
                     type: object
@@ -224,14 +198,8 @@ spec:
                   cron:
                     description: EntryID identifies an entry within a Cron instance
                     type: integer
-                  rateUpMetric:
-                    type: string
-                  totalUpMetric:
-                    type: string
                 required:
                 - cron
-                - rateUpMetric
-                - totalUpMetric
                 type: object
             required:
             - created

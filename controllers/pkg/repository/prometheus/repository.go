@@ -49,7 +49,7 @@ func (p *Repository) Create(args ...interface{}) (interface{}, error) {
 	}
 	prometheusMetric := args[0].(v1beta1.PrometheusMetric)
 
-	kernel.Logger.Info(fmt.Sprintf("metric %s creation", prometheusMetric.Name))
+	kernel.Logger.Info(fmt.Sprintf("metric %s creation of type %s", prometheusMetric.Name, prometheusMetric.Type))
 	switch prometheusMetric.Type {
 	case v1beta1.PrometheusMetricTypeCounter:
 		prometheusData := prometheus.NewCounter(prometheus.CounterOpts{
@@ -60,8 +60,6 @@ func (p *Repository) Create(args ...interface{}) (interface{}, error) {
 			kernel.Logger.Info(fmt.Sprintf("metric %s already exist", prometheusMetric.Name))
 		}
 		id := metric_db.Create(prometheusMetric.Name, prometheusData)
-		kernel.Logger.Info(fmt.Sprintf("Created with id : %s", id))
-		kernel.Logger.Info(fmt.Sprintf("metric %s created", prometheusMetric.Name))
 		return id, nil
 
 	case v1beta1.PrometheusMetricTypeHistogram:
@@ -75,7 +73,6 @@ func (p *Repository) Create(args ...interface{}) (interface{}, error) {
 		}
 
 		id := metric_db.Create(prometheusMetric.Name, prometheusData)
-		kernel.Logger.Info(fmt.Sprintf("Created with id : %s", id))
 
 		return id, nil
 	case v1beta1.PrometheusMetricTypeGauge:
@@ -88,7 +85,6 @@ func (p *Repository) Create(args ...interface{}) (interface{}, error) {
 		}
 
 		id := metric_db.Create(prometheusMetric.Name, prometheusData)
-		kernel.Logger.Info(fmt.Sprintf("Created with id : %s", id))
 		return id, nil
 	default:
 		return nil, kernel.ErrorInvalidArgument(fmt.Sprintf("metric type %s is not supported", prometheusMetric.Type))
@@ -101,8 +97,6 @@ func (p *Repository) Update(args ...interface{}) error {
 	}
 	metricId := args[0].(string)
 	value := args[1].(float64)
-
-	kernel.Logger.Info(fmt.Sprintf("metric %s updated with value %f", args[0].(string), args[1].(float64)))
 	metric_db.Update(metricId, value)
 	return nil
 }

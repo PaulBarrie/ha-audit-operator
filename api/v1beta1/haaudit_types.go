@@ -97,9 +97,7 @@ type HAAuditSpec struct {
 }
 
 type TestStatus struct {
-	CronID          cron.EntryID `json:"cron"`
-	TotalUpMetricID string       `json:"totalUpMetric"`
-	RateUpMetricID  string       `json:"rateUpMetric"`
+	CronID cron.EntryID `json:"cron"`
 }
 
 type MetricStatus struct {
@@ -118,10 +116,10 @@ type HAAuditStatus struct {
 	Created            bool               `json:"created,default=false"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
 // HAAudit is the Schema for the haaudits API
+// +kubebuilder:object:root=true
+// +k8s:openapi-gen=true
+// +kubebuilder:subresource:status
 type HAAudit struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
